@@ -46,7 +46,7 @@ export default function Header() {
 
   const handleLogout = () => {
     logout();
-    navigate('/');
+    window.location.replace('/');
   };
 
   const formatRelativeTime = (d) => {
@@ -280,7 +280,7 @@ export default function Header() {
         }]);
       }
     };
-    
+
     window.addEventListener('app:notifications-changed', onNotifChanged);
     window.addEventListener('app:forecasts-updated', onForecastChanged);
     window.addEventListener('app:toast', onToast);

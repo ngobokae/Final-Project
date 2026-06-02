@@ -71,4 +71,4 @@ Coding style and tests
 Reporting issues
 - Open GitHub issues with a clear repro, logs, and environment details.
 
-Thanks — maintainers will review PRs in priority order.
+

@@ -4,12 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button';
 import { 
   ArrowRight, 
-  Factory, 
-  Package, 
+  Hammer,
   Zap, 
-  Users, 
   TrendingUp,
-  Award,
+  Shield,
+  MapPin,
+  Phone,
+  Mail,
   Globe
 } from 'lucide-react';
 import logoSrc from '../assets/IMG_1472.PNG';
@@ -18,7 +19,7 @@ export default function Landing() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Force light mode on landing page
+    // Force light mode on landing page - same as login
     const root = document.documentElement;
     root.classList.remove('dark');
     
@@ -31,39 +32,50 @@ export default function Landing() {
     
     return () => {
       observer.disconnect();
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        try {
+          const user = JSON.parse(storedUser);
+          if (user.theme === 'dark') {
+            root.classList.add('dark');
+          }
+        } catch (e) {
+          // Ignore
+        }
+      }
     };
   }, []);
 
   const products = [
     {
-      icon: Factory,
+      icon: Hammer,
       title: 'Roofing Sheets',
-      description: 'Premium quality roofing sheets manufactured to international standards'
-    },
-    {
-      icon: Package,
-      title: 'Motorcycle Assembly',
-      description: 'Professional assembly and wholesale for the EAC market'
+      description: 'Premium quality roofing sheets manufactured to international standards with 150,000MT annual production capacity'
     },
     {
       icon: Zap,
-      title: 'Three-Wheelers',
-      description: 'Durable three-wheeler assembly and distribution'
-    },
-    {
-      icon: Award,
-      title: 'Printer Cartridges',
-      description: 'High-quality consumables under the KINGLION brand'
-    },
-    {
-      icon: Globe,
-      title: 'Solar Energy',
-      description: 'Renewable energy solutions for sustainable operations'
+      title: 'Motorcycle Assembly',
+      description: 'Professional assembly and wholesale - over 100,000 satisfied customers across Tanzania and Rwanda'
     },
     {
       icon: TrendingUp,
-      title: 'Regional Expansion',
-      description: 'Growing operations across Tanzania and Rwanda'
+      title: 'Three-Wheeler Manufacturing',
+      description: 'Durable three-wheeler assembly and distribution across the East African Community'
+    },
+    {
+      icon: Shield,
+      title: 'Printer Cartridges',
+      description: 'High-quality printer cartridge manufacturing and supply under the KINGLION brand'
+    },
+    {
+      icon: Zap,
+      title: 'Solar Energy Solutions',
+      description: 'Renewable energy products and solar solutions for sustainable manufacturing'
+    },
+    {
+      icon: TrendingUp,
+      title: 'Regional Operations',
+      description: 'Growing operations across Tanzania and Rwanda with facilities in Dar es Salaam and Kigali'
     }
   ];
 
