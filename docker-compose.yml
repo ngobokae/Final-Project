@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: manufacturing-db
+    restart: always
+    environment:
+      MYSQL_DATABASE: manufacturing_system
+      MYSQL_ROOT_PASSWORD: Jtesire74!
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./Manaf1.sql:/docker-entrypoint-initdb.d/Manaf1.sql
+
+  backend:
+    build:
+      context: ./backend/backend
+    container_name: manufacturing-backend
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - DB_HOST=db
+      - DB_USER=root
+      - DB_PASSWORD=Jtesire74!
+      - DB_NAME=manufacturing_system
+      - JWT_SECRET=manufacturing-system-secret-key-2024
+      - FRONTEND_URL=http://localhost:5173
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ./frontend/frontend
+    container_name: manufacturing-frontend
+    restart: always
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:3001
+    depends_on:
+      - backend
+
+  ml-service:
+    build:
+      context: ./ml-service/ml-service
+    container_name: manufacturing-ml
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ml-service/ml-service:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+
+volumes:
+  db_data:

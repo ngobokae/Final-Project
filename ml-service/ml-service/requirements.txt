@@ -1,0 +1,10 @@
+# Python 3.12+ compatible (no distutils needed; use wheels)
+Django==4.2.7
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+numpy>=1.26.0,<3
+pandas>=2.1.0
+scikit-learn>=1.4.0
+PyJWT==2.8.0
+# mysqlclient can be hard to build on Windows; optional for ML service (backend uses MySQL)
+# mysqlclient==2.2.0

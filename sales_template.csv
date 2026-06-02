@@ -1,0 +1,321 @@
+Date,Product SKU,Product Name,Quantity,Unit Price,Customer Name,Region
+2025-05-26,KL-SL-002,Solar Inverter 1kW Hybrid,62,280000,Bugesera Estate,Kigali
+2025-09-10,KL-MC-250,Kinglion Motorcycle - Cargo Special,5,1850000,Gicumbi Wholesalers,Western
+2025-05-21,KL-RS-001,Roofing Sheet Corrugated 0.5mm,53,11000,Kigali Construction Ltd,Eastern
+2025-01-14,KL-MC-200,Kinglion Motorcycle - Model 200,2,1500000,Musanze Builders,Southern
+2025-08-08,KL-SL-001,Solar Panel 100W Poly,99,45000,Rusizi Engineering,Western
+2025-07-18,KL-CB-002,Cement Board 9mm 4x8ft,16,24000,Lake Kivu Transport,Eastern
+2025-11-14,KL-CB-002,Cement Board 9mm 4x8ft,73,24000,Eastern Supplies,Southern
+2026-07-20,KL-RS-001,Roofing Sheet Corrugated 0.5mm,10,11000,Nyagatare Contractors,Southern
+2025-02-20,KL-SP-003,Motorcycle Tire 18-inch,71,25000,Kigali Construction Ltd,Eastern
+2026-06-23,KL-SL-001,Solar Panel 100W Poly,77,45000,Eastern Supplies,Eastern
+2025-01-07,KL-CB-002,Cement Board 9mm 4x8ft,14,24000,Nyagatare Contractors,Western
+2025-08-03,KL-MC-200,Kinglion Motorcycle - Model 200,5,1500000,Nyagatare Contractors,Kigali
+2026-10-07,KL-SP-001,Motorcycle Engine Oil 1L,59,4500,Rwanda Logistics,Kigali
+2025-01-07,KL-RS-002,Roofing Sheet Step Tile 0.5mm,29,13500,Huye Traders,Western
+2025-09-19,KL-RS-002,Roofing Sheet Step Tile 0.5mm,79,13500,Rwanda Logistics,Eastern
+2025-10-10,KL-SL-001,Solar Panel 100W Poly,51,45000,Kigali Construction Ltd,Kigali
+2025-04-11,KL-SP-001,Motorcycle Engine Oil 1L,93,4500,Rusizi Engineering,Southern
+2026-06-01,KL-SL-002,Solar Inverter 1kW Hybrid,74,280000,Nyagatare Contractors,Northern
+2025-07-19,KL-CB-002,Cement Board 9mm 4x8ft,38,24000,Rusizi Engineering,Southern
+2025-01-20,KL-RS-002,Roofing Sheet Step Tile 0.5mm,36,13500,Rwanda Logistics,Northern
+2026-01-31,KL-RS-002,Roofing Sheet Step Tile 0.5mm,52,13500,Huye Traders,Kigali
+2025-02-04,KL-MC-250,Kinglion Motorcycle - Cargo Special,1,1850000,City Delivery Services,Southern
+2025-01-06,KL-MC-200,Kinglion Motorcycle - Model 200,1,1500000,Eastern Supplies,Northern
+2025-11-25,KL-IS-002,Iron Sheet - Red 0.4mm,30,10500,Gicumbi Wholesalers,Southern
+2025-12-18,KL-MC-200,Kinglion Motorcycle - Model 200,2,1500000,Musanze Builders,Western
+2026-07-11,KL-RS-001,Roofing Sheet Corrugated 0.5mm,39,11000,Kigali Construction Ltd,Northern
+2025-05-12,KL-SP-003,Motorcycle Tire 18-inch,73,25000,Rusizi Engineering,Eastern
+2025-08-01,KL-SP-001,Motorcycle Engine Oil 1L,63,4500,Rwanda Logistics,Western
+2025-02-17,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,77,13000,Kigali Construction Ltd,Northern
+2026-06-27,KL-SL-001,Solar Panel 100W Poly,10,45000,Huye Traders,Western
+2025-09-28,KL-IS-001,Iron Sheet - Blue 0.5mm,24,12000,Gicumbi Wholesalers,Southern
+2025-02-23,KL-IS-002,Iron Sheet - Red 0.4mm,98,10500,Musanze Builders,Eastern
+2026-08-07,KL-CB-002,Cement Board 9mm 4x8ft,90,24000,Eastern Supplies,Northern
+2025-03-18,KL-IS-001,Iron Sheet - Blue 0.5mm,78,12000,Bugesera Estate,Northern
+2025-12-22,KL-MC-200,Kinglion Motorcycle - Model 200,1,1500000,Eastern Supplies,Kigali
+2026-05-01,KL-MC-200,Kinglion Motorcycle - Model 200,4,1500000,City Delivery Services,Northern
+2025-11-30,KL-SP-001,Motorcycle Engine Oil 1L,94,4500,Musanze Builders,Eastern
+2025-04-20,KL-CB-001,Cement Board 6mm 4x8ft,36,18000,Huye Traders,Western
+2026-11-01,KL-RS-002,Roofing Sheet Step Tile 0.5mm,88,13500,Lake Kivu Transport,Kigali
+2026-09-23,KL-CB-001,Cement Board 6mm 4x8ft,17,18000,Nyagatare Contractors,Western
+2026-06-19,KL-CB-002,Cement Board 9mm 4x8ft,65,24000,Eastern Supplies,Southern
+2025-01-27,KL-IS-001,Iron Sheet - Blue 0.5mm,106,12000,Lake Kivu Transport,Southern
+2026-02-28,KL-RS-001,Roofing Sheet Corrugated 0.5mm,44,11000,Kigali Construction Ltd,Kigali
+2026-03-22,KL-MC-150,Kinglion Motorcycle - Model 150,5,1250000,Eastern Supplies,Northern
+2025-07-16,KL-RS-001,Roofing Sheet Corrugated 0.5mm,96,11000,Musanze Builders,Kigali
+2025-11-26,KL-SL-001,Solar Panel 100W Poly,67,45000,Huye Traders,Northern
+2026-02-13,KL-RS-001,Roofing Sheet Corrugated 0.5mm,12,11000,Nyagatare Contractors,Eastern
+2026-12-19,KL-SL-001,Solar Panel 100W Poly,83,45000,Rwanda Logistics,Eastern
+2026-03-23,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,20,13000,Musanze Builders,Eastern
+2025-09-03,KL-RS-002,Roofing Sheet Step Tile 0.5mm,100,13500,Musanze Builders,Kigali
+2025-11-07,KL-CB-001,Cement Board 6mm 4x8ft,86,18000,Rubavu Hardware,Eastern
+2025-05-04,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,95,13000,Kigali Construction Ltd,Kigali
+2026-08-07,KL-SL-001,Solar Panel 100W Poly,15,45000,Gicumbi Wholesalers,Western
+2026-08-05,KL-SP-002,Brake Pad Set - Model 150,94,8000,Rwanda Logistics,Southern
+2025-11-21,KL-IS-002,Iron Sheet - Red 0.4mm,90,10500,Lake Kivu Transport,Southern
+2025-01-28,KL-SL-002,Solar Inverter 1kW Hybrid,106,280000,Gicumbi Wholesalers,Kigali
+2026-11-13,KL-IS-002,Iron Sheet - Red 0.4mm,40,10500,Nyagatare Contractors,Northern
+2026-02-27,KL-IS-001,Iron Sheet - Blue 0.5mm,108,12000,City Delivery Services,Eastern
+2025-08-30,KL-CB-002,Cement Board 9mm 4x8ft,85,24000,Nyagatare Contractors,Eastern
+2026-11-12,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,27,13000,City Delivery Services,Eastern
+2025-09-30,KL-MC-200,Kinglion Motorcycle - Model 200,4,1500000,Lake Kivu Transport,Northern
+2026-10-02,KL-RS-001,Roofing Sheet Corrugated 0.5mm,57,11000,Rusizi Engineering,Southern
+2026-05-02,KL-SL-001,Solar Panel 100W Poly,82,45000,Bugesera Estate,Western
+2026-07-13,KL-MC-200,Kinglion Motorcycle - Model 200,1,1500000,Eastern Supplies,Northern
+2025-07-16,KL-CB-001,Cement Board 6mm 4x8ft,77,18000,City Delivery Services,Kigali
+2025-05-29,KL-RS-001,Roofing Sheet Corrugated 0.5mm,47,11000,Eastern Supplies,Western
+2025-11-15,KL-RS-002,Roofing Sheet Step Tile 0.5mm,20,13500,Bugesera Estate,Eastern
+2026-05-04,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,98,13000,Gicumbi Wholesalers,Western
+2026-04-01,KL-SP-001,Motorcycle Engine Oil 1L,17,4500,Kigali Construction Ltd,Kigali
+2025-02-10,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,74,13000,Bugesera Estate,Kigali
+2025-05-23,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,54,13000,City Delivery Services,Northern
+2026-11-15,KL-RS-001,Roofing Sheet Corrugated 0.5mm,98,11000,Lake Kivu Transport,Northern
+2026-08-03,KL-MC-250,Kinglion Motorcycle - Cargo Special,1,1850000,Rwanda Logistics,Eastern
+2026-04-02,KL-SP-003,Motorcycle Tire 18-inch,78,25000,Eastern Supplies,Northern
+2025-02-26,KL-MC-150,Kinglion Motorcycle - Model 150,3,1250000,Gicumbi Wholesalers,Northern
+2025-11-08,KL-SL-002,Solar Inverter 1kW Hybrid,32,280000,Bugesera Estate,Northern
+2025-09-26,KL-MC-250,Kinglion Motorcycle - Cargo Special,2,1850000,Rubavu Hardware,Kigali
+2026-02-09,KL-SP-001,Motorcycle Engine Oil 1L,62,4500,Bugesera Estate,Kigali
+2026-04-24,KL-RS-002,Roofing Sheet Step Tile 0.5mm,82,13500,Rusizi Engineering,Southern
+2026-04-28,KL-SL-002,Solar Inverter 1kW Hybrid,15,280000,Nyagatare Contractors,Kigali
+2026-10-15,KL-SP-003,Motorcycle Tire 18-inch,105,25000,Gicumbi Wholesalers,Southern
+2026-03-12,KL-IS-002,Iron Sheet - Red 0.4mm,29,10500,Rusizi Engineering,Western
+2025-07-05,KL-SP-001,Motorcycle Engine Oil 1L,86,4500,Gicumbi Wholesalers,Northern
+2025-10-12,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,40,13000,Rubavu Hardware,Eastern
+2026-11-10,KL-RS-001,Roofing Sheet Corrugated 0.5mm,51,11000,Bugesera Estate,Western
+2026-02-14,KL-RS-001,Roofing Sheet Corrugated 0.5mm,90,11000,Kigali Construction Ltd,Eastern
+2025-05-15,KL-RS-001,Roofing Sheet Corrugated 0.5mm,67,11000,Musanze Builders,Northern
+2025-08-26,KL-CB-002,Cement Board 9mm 4x8ft,80,24000,Nyagatare Contractors,Kigali
+2025-07-25,KL-MC-200,Kinglion Motorcycle - Model 200,4,1500000,Gicumbi Wholesalers,Northern
+2026-07-25,KL-SL-001,Solar Panel 100W Poly,81,45000,Kigali Construction Ltd,Eastern
+2025-08-27,KL-IS-002,Iron Sheet - Red 0.4mm,17,10500,City Delivery Services,Northern
+2026-02-21,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,96,13000,Rwanda Logistics,Southern
+2025-03-11,KL-SP-003,Motorcycle Tire 18-inch,32,25000,Gicumbi Wholesalers,Southern
+2026-09-11,KL-CB-001,Cement Board 6mm 4x8ft,31,18000,Lake Kivu Transport,Southern
+2025-11-08,KL-CB-002,Cement Board 9mm 4x8ft,70,24000,Musanze Builders,Eastern
+2025-02-03,KL-RS-002,Roofing Sheet Step Tile 0.5mm,25,13500,Lake Kivu Transport,Eastern
+2025-01-23,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,51,13000,Rubavu Hardware,Western
+2026-12-25,KL-IS-001,Iron Sheet - Blue 0.5mm,86,12000,Lake Kivu Transport,Eastern
+2026-07-30,KL-RS-002,Roofing Sheet Step Tile 0.5mm,72,13500,Nyagatare Contractors,Northern
+2025-01-02,KL-SP-001,Motorcycle Engine Oil 1L,41,4500,Huye Traders,Eastern
+2025-05-01,KL-MC-200,Kinglion Motorcycle - Model 200,2,1500000,Bugesera Estate,Northern
+2025-09-02,KL-SP-003,Motorcycle Tire 18-inch,102,25000,Bugesera Estate,Northern
+2025-07-16,KL-MC-150,Kinglion Motorcycle - Model 150,1,1250000,Gicumbi Wholesalers,Eastern
+2025-12-08,KL-RS-001,Roofing Sheet Corrugated 0.5mm,70,11000,Musanze Builders,Western
+2026-07-11,KL-IS-001,Iron Sheet - Blue 0.5mm,29,12000,Bugesera Estate,Northern
+2026-04-10,KL-RS-002,Roofing Sheet Step Tile 0.5mm,106,13500,Bugesera Estate,Northern
+2026-05-10,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,22,13000,Kigali Construction Ltd,Southern
+2026-03-11,KL-CB-001,Cement Board 6mm 4x8ft,23,18000,Bugesera Estate,Kigali
+2026-08-28,KL-IS-002,Iron Sheet - Red 0.4mm,30,10500,Bugesera Estate,Southern
+2025-07-16,KL-SP-003,Motorcycle Tire 18-inch,59,25000,Rubavu Hardware,Eastern
+2026-03-31,KL-SP-003,Motorcycle Tire 18-inch,45,25000,Kigali Construction Ltd,Kigali
+2025-07-13,KL-SP-001,Motorcycle Engine Oil 1L,104,4500,Kigali Construction Ltd,Western
+2026-05-10,KL-MC-150,Kinglion Motorcycle - Model 150,2,1250000,Nyagatare Contractors,Western
+2026-07-20,KL-CB-001,Cement Board 6mm 4x8ft,89,18000,Nyagatare Contractors,Southern
+2026-01-06,KL-RS-002,Roofing Sheet Step Tile 0.5mm,14,13500,Rubavu Hardware,Northern
+2026-10-14,KL-RS-001,Roofing Sheet Corrugated 0.5mm,87,11000,Huye Traders,Kigali
+2025-09-29,KL-IS-001,Iron Sheet - Blue 0.5mm,61,12000,Kigali Construction Ltd,Southern
+2025-10-05,KL-SL-001,Solar Panel 100W Poly,30,45000,Nyagatare Contractors,Eastern
+2025-11-10,KL-MC-250,Kinglion Motorcycle - Cargo Special,4,1850000,Nyagatare Contractors,Western
+2026-02-12,KL-SP-003,Motorcycle Tire 18-inch,106,25000,Kigali Construction Ltd,Northern
+2025-04-03,KL-MC-250,Kinglion Motorcycle - Cargo Special,1,1850000,Lake Kivu Transport,Kigali
+2025-10-24,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,22,13000,Kigali Construction Ltd,Eastern
+2025-01-28,KL-MC-200,Kinglion Motorcycle - Model 200,1,1500000,Nyagatare Contractors,Eastern
+2026-11-07,KL-MC-250,Kinglion Motorcycle - Cargo Special,2,1850000,Rubavu Hardware,Eastern
+2026-12-24,KL-IS-001,Iron Sheet - Blue 0.5mm,15,12000,Rubavu Hardware,Eastern
+2026-07-22,KL-MC-200,Kinglion Motorcycle - Model 200,3,1500000,Rubavu Hardware,Kigali
+2025-09-14,KL-SP-002,Brake Pad Set - Model 150,59,8000,Musanze Builders,Northern
+2026-09-18,KL-MC-150,Kinglion Motorcycle - Model 150,4,1250000,Huye Traders,Kigali
+2025-08-27,KL-RS-001,Roofing Sheet Corrugated 0.5mm,66,11000,Musanze Builders,Western
+2025-10-29,KL-IS-001,Iron Sheet - Blue 0.5mm,105,12000,Musanze Builders,Northern
+2025-10-07,KL-IS-002,Iron Sheet - Red 0.4mm,100,10500,Rusizi Engineering,Eastern
+2026-11-19,KL-SL-001,Solar Panel 100W Poly,97,45000,Kigali Construction Ltd,Northern
+2025-07-26,KL-SP-003,Motorcycle Tire 18-inch,89,25000,Rwanda Logistics,Eastern
+2026-03-23,KL-CB-001,Cement Board 6mm 4x8ft,71,18000,Rubavu Hardware,Northern
+2026-12-15,KL-SP-003,Motorcycle Tire 18-inch,109,25000,City Delivery Services,Western
+2026-03-21,KL-RS-001,Roofing Sheet Corrugated 0.5mm,50,11000,Rubavu Hardware,Kigali
+2026-04-24,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,107,13000,Huye Traders,Eastern
+2025-09-10,KL-SP-001,Motorcycle Engine Oil 1L,64,4500,Musanze Builders,Southern
+2025-02-05,KL-MC-250,Kinglion Motorcycle - Cargo Special,5,1850000,Rwanda Logistics,Kigali
+2026-01-11,KL-SL-002,Solar Inverter 1kW Hybrid,24,280000,Nyagatare Contractors,Western
+2026-07-31,KL-SP-001,Motorcycle Engine Oil 1L,80,4500,Eastern Supplies,Eastern
+2025-12-20,KL-CB-001,Cement Board 6mm 4x8ft,103,18000,Gicumbi Wholesalers,Northern
+2026-04-11,KL-RS-001,Roofing Sheet Corrugated 0.5mm,46,11000,Rusizi Engineering,Eastern
+2025-03-18,KL-CB-002,Cement Board 9mm 4x8ft,36,24000,Nyagatare Contractors,Southern
+2026-02-14,KL-SP-003,Motorcycle Tire 18-inch,63,25000,Bugesera Estate,Western
+2025-11-28,KL-RS-001,Roofing Sheet Corrugated 0.5mm,49,11000,Rwanda Logistics,Western
+2026-06-24,KL-MC-200,Kinglion Motorcycle - Model 200,3,1500000,Bugesera Estate,Kigali
+2026-08-06,KL-RS-002,Roofing Sheet Step Tile 0.5mm,21,13500,Musanze Builders,Northern
+2026-07-05,KL-SP-003,Motorcycle Tire 18-inch,65,25000,Gicumbi Wholesalers,Western
+2025-06-04,KL-CB-001,Cement Board 6mm 4x8ft,84,18000,Nyagatare Contractors,Northern
+2025-11-09,KL-SP-003,Motorcycle Tire 18-inch,93,25000,Rusizi Engineering,Western
+2025-01-24,KL-SL-002,Solar Inverter 1kW Hybrid,33,280000,Rwanda Logistics,Western
+2025-08-02,KL-IS-001,Iron Sheet - Blue 0.5mm,48,12000,Eastern Supplies,Western
+2026-06-15,KL-SP-003,Motorcycle Tire 18-inch,49,25000,Eastern Supplies,Northern
+2025-04-24,KL-SP-003,Motorcycle Tire 18-inch,90,25000,Kigali Construction Ltd,Western
+2026-07-24,KL-CB-001,Cement Board 6mm 4x8ft,28,18000,Musanze Builders,Western
+2026-11-02,KL-SP-002,Brake Pad Set - Model 150,36,8000,Musanze Builders,Eastern
+2025-03-12,KL-SL-002,Solar Inverter 1kW Hybrid,37,280000,City Delivery Services,Western
+2026-05-22,KL-CB-001,Cement Board 6mm 4x8ft,95,18000,City Delivery Services,Eastern
+2025-03-15,KL-SP-002,Brake Pad Set - Model 150,49,8000,Kigali Construction Ltd,Western
+2025-01-06,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,17,13000,Gicumbi Wholesalers,Kigali
+2026-09-07,KL-CB-001,Cement Board 6mm 4x8ft,82,18000,Kigali Construction Ltd,Southern
+2026-03-14,KL-SL-002,Solar Inverter 1kW Hybrid,71,280000,Rusizi Engineering,Northern
+2026-10-03,KL-MC-250,Kinglion Motorcycle - Cargo Special,2,1850000,Eastern Supplies,Western
+2026-06-17,KL-CB-002,Cement Board 9mm 4x8ft,73,24000,Gicumbi Wholesalers,Western
+2026-01-04,KL-MC-250,Kinglion Motorcycle - Cargo Special,4,1850000,Lake Kivu Transport,Southern
+2026-02-25,KL-CB-002,Cement Board 9mm 4x8ft,92,24000,Rusizi Engineering,Eastern
+2026-06-19,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,81,13000,Rubavu Hardware,Kigali
+2025-09-26,KL-CB-002,Cement Board 9mm 4x8ft,89,24000,Nyagatare Contractors,Northern
+2025-03-03,KL-MC-250,Kinglion Motorcycle - Cargo Special,5,1850000,Kigali Construction Ltd,Kigali
+2026-09-13,KL-RS-002,Roofing Sheet Step Tile 0.5mm,73,13500,City Delivery Services,Western
+2025-05-25,KL-IS-001,Iron Sheet - Blue 0.5mm,61,12000,Nyagatare Contractors,Southern
+2025-01-07,KL-SL-002,Solar Inverter 1kW Hybrid,15,280000,Rusizi Engineering,Southern
+2025-10-03,KL-IS-002,Iron Sheet - Red 0.4mm,26,10500,Lake Kivu Transport,Western
+2026-11-21,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,64,13000,Rubavu Hardware,Eastern
+2025-03-18,KL-RS-001,Roofing Sheet Corrugated 0.5mm,61,11000,Rubavu Hardware,Western
+2026-08-23,KL-SL-001,Solar Panel 100W Poly,17,45000,Musanze Builders,Southern
+2025-11-14,KL-CB-002,Cement Board 9mm 4x8ft,17,24000,Gicumbi Wholesalers,Eastern
+2025-05-07,KL-RS-002,Roofing Sheet Step Tile 0.5mm,21,13500,Nyagatare Contractors,Western
+2025-10-21,KL-MC-150,Kinglion Motorcycle - Model 150,4,1250000,Rwanda Logistics,Kigali
+2026-08-18,KL-IS-001,Iron Sheet - Blue 0.5mm,65,12000,Lake Kivu Transport,Eastern
+2026-01-25,KL-RS-002,Roofing Sheet Step Tile 0.5mm,60,13500,Lake Kivu Transport,Northern
+2025-11-12,KL-CB-002,Cement Board 9mm 4x8ft,80,24000,Rwanda Logistics,Northern
+2026-04-26,KL-CB-002,Cement Board 9mm 4x8ft,91,24000,Rwanda Logistics,Northern
+2026-08-15,KL-IS-002,Iron Sheet - Red 0.4mm,45,10500,Gicumbi Wholesalers,Western
+2025-10-03,KL-IS-002,Iron Sheet - Red 0.4mm,89,10500,City Delivery Services,Western
+2026-10-23,KL-RS-001,Roofing Sheet Corrugated 0.5mm,35,11000,Gicumbi Wholesalers,Kigali
+2026-09-03,KL-IS-002,Iron Sheet - Red 0.4mm,77,10500,Kigali Construction Ltd,Kigali
+2026-12-09,KL-SP-002,Brake Pad Set - Model 150,60,8000,Huye Traders,Southern
+2025-07-10,KL-MC-250,Kinglion Motorcycle - Cargo Special,1,1850000,Rubavu Hardware,Southern
+2026-12-26,KL-CB-001,Cement Board 6mm 4x8ft,91,18000,Huye Traders,Western
+2025-06-26,KL-CB-001,Cement Board 6mm 4x8ft,91,18000,Musanze Builders,Western
+2025-10-04,KL-SP-002,Brake Pad Set - Model 150,79,8000,Rwanda Logistics,Western
+2026-11-10,KL-CB-002,Cement Board 9mm 4x8ft,73,24000,Lake Kivu Transport,Southern
+2025-09-23,KL-MC-250,Kinglion Motorcycle - Cargo Special,1,1850000,Rusizi Engineering,Western
+2026-04-20,KL-CB-002,Cement Board 9mm 4x8ft,80,24000,Bugesera Estate,Southern
+2025-05-12,KL-RS-002,Roofing Sheet Step Tile 0.5mm,25,13500,Rusizi Engineering,Eastern
+2026-06-12,KL-RS-001,Roofing Sheet Corrugated 0.5mm,57,11000,Gicumbi Wholesalers,Kigali
+2026-12-13,KL-CB-001,Cement Board 6mm 4x8ft,34,18000,Nyagatare Contractors,Southern
+2026-10-21,KL-MC-150,Kinglion Motorcycle - Model 150,4,1250000,Gicumbi Wholesalers,Kigali
+2025-05-29,KL-RS-002,Roofing Sheet Step Tile 0.5mm,90,13500,Rwanda Logistics,Northern
+2026-05-03,KL-MC-250,Kinglion Motorcycle - Cargo Special,1,1850000,Bugesera Estate,Southern
+2025-11-23,KL-SP-002,Brake Pad Set - Model 150,15,8000,Huye Traders,Kigali
+2026-01-24,KL-SP-001,Motorcycle Engine Oil 1L,38,4500,Musanze Builders,Northern
+2025-10-26,KL-SL-002,Solar Inverter 1kW Hybrid,57,280000,Rwanda Logistics,Eastern
+2026-10-03,KL-MC-150,Kinglion Motorcycle - Model 150,1,1250000,Rubavu Hardware,Kigali
+2025-01-22,KL-SL-002,Solar Inverter 1kW Hybrid,53,280000,Huye Traders,Eastern
+2026-07-30,KL-SL-001,Solar Panel 100W Poly,47,45000,Bugesera Estate,Southern
+2026-07-09,KL-SP-001,Motorcycle Engine Oil 1L,40,4500,Nyagatare Contractors,Western
+2025-11-30,KL-CB-002,Cement Board 9mm 4x8ft,69,24000,Kigali Construction Ltd,Southern
+2025-03-17,KL-RS-002,Roofing Sheet Step Tile 0.5mm,80,13500,Bugesera Estate,Kigali
+2026-04-22,KL-CB-002,Cement Board 9mm 4x8ft,97,24000,Bugesera Estate,Southern
+2026-07-23,KL-SP-001,Motorcycle Engine Oil 1L,86,4500,Kigali Construction Ltd,Northern
+2026-04-27,KL-RS-002,Roofing Sheet Step Tile 0.5mm,96,13500,Musanze Builders,Northern
+2026-07-26,KL-SL-002,Solar Inverter 1kW Hybrid,12,280000,Kigali Construction Ltd,Western
+2026-02-13,KL-CB-002,Cement Board 9mm 4x8ft,73,24000,Rubavu Hardware,Western
+2026-08-01,KL-MC-200,Kinglion Motorcycle - Model 200,1,1500000,City Delivery Services,Southern
+2025-08-11,KL-IS-001,Iron Sheet - Blue 0.5mm,33,12000,Musanze Builders,Eastern
+2025-08-13,KL-MC-150,Kinglion Motorcycle - Model 150,2,1250000,Kigali Construction Ltd,Kigali
+2025-08-30,KL-MC-250,Kinglion Motorcycle - Cargo Special,2,1850000,Rusizi Engineering,Western
+2026-02-11,KL-SP-003,Motorcycle Tire 18-inch,84,25000,City Delivery Services,Eastern
+2025-09-01,KL-SL-001,Solar Panel 100W Poly,76,45000,Lake Kivu Transport,Eastern
+2026-02-12,KL-SP-002,Brake Pad Set - Model 150,40,8000,Rwanda Logistics,Western
+2026-10-17,KL-SP-001,Motorcycle Engine Oil 1L,62,4500,Rwanda Logistics,Southern
+2025-07-30,KL-SL-001,Solar Panel 100W Poly,92,45000,Nyagatare Contractors,Northern
+2025-03-04,KL-CB-001,Cement Board 6mm 4x8ft,71,18000,Rusizi Engineering,Southern
+2026-02-10,KL-IS-001,Iron Sheet - Blue 0.5mm,97,12000,City Delivery Services,Southern
+2025-02-22,KL-MC-150,Kinglion Motorcycle - Model 150,1,1250000,Rubavu Hardware,Kigali
+2026-02-09,KL-MC-250,Kinglion Motorcycle - Cargo Special,2,1850000,Gicumbi Wholesalers,Southern
+2026-04-04,KL-CB-001,Cement Board 6mm 4x8ft,99,18000,Rubavu Hardware,Southern
+2025-12-18,KL-IS-001,Iron Sheet - Blue 0.5mm,51,12000,Nyagatare Contractors,Western
+2025-02-12,KL-SP-002,Brake Pad Set - Model 150,77,8000,Eastern Supplies,Western
+2026-04-29,KL-CB-001,Cement Board 6mm 4x8ft,35,18000,Bugesera Estate,Northern
+2025-06-29,KL-CB-002,Cement Board 9mm 4x8ft,58,24000,Rusizi Engineering,Southern
+2025-06-13,KL-IS-001,Iron Sheet - Blue 0.5mm,36,12000,Kigali Construction Ltd,Northern
+2025-01-09,KL-SL-001,Solar Panel 100W Poly,62,45000,Rubavu Hardware,Eastern
+2025-02-16,KL-SP-001,Motorcycle Engine Oil 1L,103,4500,Nyagatare Contractors,Kigali
+2026-08-10,KL-CB-001,Cement Board 6mm 4x8ft,25,18000,Eastern Supplies,Southern
+2026-05-10,KL-CB-001,Cement Board 6mm 4x8ft,103,18000,City Delivery Services,Southern
+2026-01-23,KL-MC-200,Kinglion Motorcycle - Model 200,4,1500000,Rubavu Hardware,Southern
+2026-07-29,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,50,13000,Nyagatare Contractors,Western
+2026-01-02,KL-SL-002,Solar Inverter 1kW Hybrid,25,280000,Kigali Construction Ltd,Western
+2025-01-14,KL-MC-150,Kinglion Motorcycle - Model 150,4,1250000,Lake Kivu Transport,Western
+2025-02-12,KL-SP-003,Motorcycle Tire 18-inch,54,25000,Gicumbi Wholesalers,Southern
+2026-05-09,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,17,13000,Gicumbi Wholesalers,Southern
+2026-03-22,KL-SP-002,Brake Pad Set - Model 150,11,8000,Bugesera Estate,Northern
+2025-10-24,KL-MC-250,Kinglion Motorcycle - Cargo Special,5,1850000,Rusizi Engineering,Southern
+2026-08-25,KL-SL-001,Solar Panel 100W Poly,43,45000,Huye Traders,Southern
+2026-11-13,KL-CB-002,Cement Board 9mm 4x8ft,48,24000,Kigali Construction Ltd,Northern
+2026-01-02,KL-IS-001,Iron Sheet - Blue 0.5mm,43,12000,Gicumbi Wholesalers,Southern
+2025-10-26,KL-SP-001,Motorcycle Engine Oil 1L,83,4500,Kigali Construction Ltd,Kigali
+2026-09-28,KL-SL-002,Solar Inverter 1kW Hybrid,31,280000,Nyagatare Contractors,Kigali
+2026-10-23,KL-IS-002,Iron Sheet - Red 0.4mm,91,10500,Rwanda Logistics,Southern
+2026-10-22,KL-SP-003,Motorcycle Tire 18-inch,71,25000,Huye Traders,Eastern
+2025-03-01,KL-SP-003,Motorcycle Tire 18-inch,61,25000,Eastern Supplies,Northern
+2025-01-04,KL-SP-003,Motorcycle Tire 18-inch,94,25000,Eastern Supplies,Eastern
+2025-01-03,KL-MC-250,Kinglion Motorcycle - Cargo Special,5,1850000,Huye Traders,Eastern
+2026-03-28,KL-MC-250,Kinglion Motorcycle - Cargo Special,1,1850000,Musanze Builders,Western
+2025-06-15,KL-MC-200,Kinglion Motorcycle - Model 200,3,1500000,Nyagatare Contractors,Eastern
+2026-04-09,KL-SP-002,Brake Pad Set - Model 150,57,8000,City Delivery Services,Western
+2025-10-27,KL-RS-002,Roofing Sheet Step Tile 0.5mm,26,13500,Rusizi Engineering,Western
+2026-09-20,KL-SP-002,Brake Pad Set - Model 150,34,8000,Rubavu Hardware,Eastern
+2025-08-12,KL-IS-002,Iron Sheet - Red 0.4mm,45,10500,Lake Kivu Transport,Southern
+2026-04-25,KL-CB-002,Cement Board 9mm 4x8ft,68,24000,Lake Kivu Transport,Northern
+2025-01-16,KL-SL-001,Solar Panel 100W Poly,78,45000,Nyagatare Contractors,Western
+2025-03-31,KL-SP-002,Brake Pad Set - Model 150,59,8000,Rusizi Engineering,Kigali
+2025-05-27,KL-RS-001,Roofing Sheet Corrugated 0.5mm,45,11000,Rusizi Engineering,Kigali
+2025-11-21,KL-SL-001,Solar Panel 100W Poly,98,45000,Gicumbi Wholesalers,Southern
+2026-08-04,KL-SL-002,Solar Inverter 1kW Hybrid,15,280000,Nyagatare Contractors,Eastern
+2026-09-14,KL-RS-002,Roofing Sheet Step Tile 0.5mm,49,13500,Lake Kivu Transport,Western
+2026-10-26,KL-SL-001,Solar Panel 100W Poly,89,45000,Rwanda Logistics,Western
+2025-04-26,KL-SP-002,Brake Pad Set - Model 150,33,8000,Nyagatare Contractors,Northern
+2025-08-20,KL-CB-002,Cement Board 9mm 4x8ft,46,24000,Nyagatare Contractors,Northern
+2025-12-18,KL-MC-200,Kinglion Motorcycle - Model 200,2,1500000,Bugesera Estate,Northern
+2026-10-10,KL-IS-002,Iron Sheet - Red 0.4mm,74,10500,Bugesera Estate,Kigali
+2026-03-18,KL-MC-200,Kinglion Motorcycle - Model 200,5,1500000,Rwanda Logistics,Northern
+2025-01-06,KL-RS-002,Roofing Sheet Step Tile 0.5mm,48,13500,Huye Traders,Western
+2025-12-11,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,84,13000,Gicumbi Wholesalers,Eastern
+2026-08-06,KL-CB-002,Cement Board 9mm 4x8ft,57,24000,Rubavu Hardware,Eastern
+2025-05-17,KL-RS-001,Roofing Sheet Corrugated 0.5mm,96,11000,Rusizi Engineering,Kigali
+2025-08-18,KL-CB-002,Cement Board 9mm 4x8ft,38,24000,Lake Kivu Transport,Northern
+2025-08-16,KL-SL-002,Solar Inverter 1kW Hybrid,84,280000,Huye Traders,Western
+2026-10-22,KL-MC-200,Kinglion Motorcycle - Model 200,2,1500000,Eastern Supplies,Kigali
+2025-11-03,KL-CB-001,Cement Board 6mm 4x8ft,41,18000,Huye Traders,Kigali
+2026-08-20,KL-MC-250,Kinglion Motorcycle - Cargo Special,4,1850000,Rwanda Logistics,Southern
+2026-12-05,KL-MC-250,Kinglion Motorcycle - Cargo Special,2,1850000,City Delivery Services,Eastern
+2026-06-21,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,58,13000,Rusizi Engineering,Kigali
+2026-02-28,KL-IS-001,Iron Sheet - Blue 0.5mm,46,12000,Kigali Construction Ltd,Western
+2026-12-26,KL-RS-001,Roofing Sheet Corrugated 0.5mm,45,11000,City Delivery Services,Eastern
+2026-05-22,KL-SL-002,Solar Inverter 1kW Hybrid,97,280000,Bugesera Estate,Eastern
+2026-01-10,KL-MC-250,Kinglion Motorcycle - Cargo Special,2,1850000,Lake Kivu Transport,Western
+2025-10-03,KL-SL-002,Solar Inverter 1kW Hybrid,86,280000,Eastern Supplies,Western
+2025-03-28,KL-MC-150,Kinglion Motorcycle - Model 150,5,1250000,Rusizi Engineering,Western
+2026-01-07,KL-MC-250,Kinglion Motorcycle - Cargo Special,4,1850000,City Delivery Services,Eastern
+2026-04-02,KL-CB-001,Cement Board 6mm 4x8ft,64,18000,Rusizi Engineering,Kigali
+2025-10-28,KL-SP-001,Motorcycle Engine Oil 1L,44,4500,Eastern Supplies,Southern
+2026-01-19,KL-MC-200,Kinglion Motorcycle - Model 200,2,1500000,Huye Traders,Western
+2025-05-21,KL-CB-002,Cement Board 9mm 4x8ft,31,24000,Musanze Builders,Northern
+2025-11-26,KL-RS-002,Roofing Sheet Step Tile 0.5mm,57,13500,Nyagatare Contractors,Northern
+2025-07-21,KL-MC-150,Kinglion Motorcycle - Model 150,1,1250000,Rusizi Engineering,Eastern
+2025-04-11,KL-SP-003,Motorcycle Tire 18-inch,75,25000,Gicumbi Wholesalers,Northern
+2025-03-23,KL-CB-001,Cement Board 6mm 4x8ft,35,18000,Eastern Supplies,Western
+2026-04-13,KL-RS-002,Roofing Sheet Step Tile 0.5mm,73,13500,Lake Kivu Transport,Northern
+2026-11-05,KL-CB-001,Cement Board 6mm 4x8ft,52,18000,Rwanda Logistics,Eastern
+2025-10-27,KL-SP-003,Motorcycle Tire 18-inch,107,25000,Rubavu Hardware,Southern
+2025-08-03,KL-MC-150,Kinglion Motorcycle - Model 150,2,1250000,Lake Kivu Transport,Kigali
+2026-05-21,KL-SP-002,Brake Pad Set - Model 150,25,8000,Rusizi Engineering,Eastern
+2026-08-22,KL-RS-002,Roofing Sheet Step Tile 0.5mm,28,13500,Lake Kivu Transport,Western
+2026-04-12,KL-SP-001,Motorcycle Engine Oil 1L,61,4500,Rubavu Hardware,Western
+2025-12-04,KL-SP-001,Motorcycle Engine Oil 1L,59,4500,Rusizi Engineering,Northern
+2026-01-10,KL-SL-002,Solar Inverter 1kW Hybrid,12,280000,Rubavu Hardware,Western
+2026-08-24,KL-RS-002,Roofing Sheet Step Tile 0.5mm,88,13500,Huye Traders,Western
+2026-05-27,KL-SP-001,Motorcycle Engine Oil 1L,58,4500,Nyagatare Contractors,Southern
+2026-01-06,KL-IS-006,Iron Sheet - Matte Grey 0.5mm,107,13000,Rusizi Engineering,Western
+2025-01-09,KL-RS-002,Roofing Sheet Step Tile 0.5mm,51,13500,Gicumbi Wholesalers,Eastern
+2026-05-19,KL-RS-002,Roofing Sheet Step Tile 0.5mm,28,13500,City Delivery Services,Kigali
+2026-09-17,KL-RS-002,Roofing Sheet Step Tile 0.5mm,63,13500,Lake Kivu Transport,Eastern
+2026-11-07,KL-SL-002,Solar Inverter 1kW Hybrid,105,280000,Rusizi Engineering,Southern
+2025-04-30,KL-SP-003,Motorcycle Tire 18-inch,37,25000,City Delivery Services,Southern
+2026-05-22,KL-SL-002,Solar Inverter 1kW Hybrid,36,280000,Bugesera Estate,Kigali
