@@ -37,12 +37,21 @@ npm run dev
 
 ```powershell
 cd ml-service\ml-service
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-cp .env.example .env
-python manage.py migrate
-python manage.py runserver 8000
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
+copy .env.example .env
+# Edit .env with your config
+.\venv\Scripts\python.exe manage.py migrate
+.\venv\Scripts\python.exe manage.py runserver 8000
+```
+
+Or, use the venv Python directly without activation:
+
+```powershell
+cd ml-service\ml-service
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
+.\venv\Scripts\python.exe manage.py runserver 8000
 ```
 
 4) Docker (one-step)
