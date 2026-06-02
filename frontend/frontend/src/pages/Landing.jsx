@@ -1,264 +1,309 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
 import { 
   ArrowRight, 
+  Factory, 
+  Package, 
   Zap, 
-  BarChart3, 
-  Clock, 
-  Shield, 
   Users, 
   TrendingUp,
-  Sparkles
+  Award,
+  Globe
 } from 'lucide-react';
-import { Button } from '../components/ui/button';
 import logoSrc from '../assets/IMG_1472.PNG';
 
 export default function Landing() {
   const navigate = useNavigate();
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [scrollY, setScrollY] = useState(0);
 
   useEffect(() => {
-    setIsLoaded(true);
-    const handleScroll = () => setScrollY(window.scrollY);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    // Force light mode on landing page
+    const root = document.documentElement;
+    root.classList.remove('dark');
+    
+    const observer = new MutationObserver(() => {
+      if (root.classList.contains('dark')) {
+        root.classList.remove('dark');
+      }
+    });
+    observer.observe(root, { attributes: true, attributeFilter: ['class'] });
+    
+    return () => {
+      observer.disconnect();
+    };
   }, []);
 
-  const features = [
+  const products = [
     {
-      icon: BarChart3,
+      icon: Factory,
       title: 'Roofing Sheets',
-      description: 'Premium quality roofing sheets manufactured to international standards with 150,000MT annual production capacity'
+      description: 'Premium quality roofing sheets manufactured to international standards'
+    },
+    {
+      icon: Package,
+      title: 'Motorcycle Assembly',
+      description: 'Professional assembly and wholesale for the EAC market'
     },
     {
       icon: Zap,
-      title: 'Motorcycle Assembly',
-      description: 'Professional assembly and wholesale of motorcycles - over 100,000 satisfied customers across Tanzania and Rwanda'
+      title: 'Three-Wheelers',
+      description: 'Durable three-wheeler assembly and distribution'
     },
     {
-      icon: Clock,
-      title: 'Three-Wheeler Manufacturing',
-      description: 'Durable three-wheeler assembly and distribution across the East African Community'
-    },
-    {
-      icon: Shield,
+      icon: Award,
       title: 'Printer Cartridges',
-      description: 'High-quality printer cartridge manufacturing and supply under the KINGLION brand'
+      description: 'High-quality consumables under the KINGLION brand'
     },
     {
-      icon: Users,
-      title: 'Solar Energy Solutions',
-      description: 'Renewable energy products and solar solutions for sustainable manufacturing'
+      icon: Globe,
+      title: 'Solar Energy',
+      description: 'Renewable energy solutions for sustainable operations'
     },
     {
       icon: TrendingUp,
       title: 'Regional Expansion',
-      description: 'Growing operations across Tanzania and Rwanda with facilities in Dar es Salaam and Kigali'
+      description: 'Growing operations across Tanzania and Rwanda'
     }
   ];
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden">
-      {/* Animated background elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-600/20 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-        <div className="absolute top-0 right-1/4 w-96 h-96 bg-purple-600/20 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
-        <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-pink-600/20 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
-      </div>
+  const stats = [
+    { value: '150K MT', label: 'Annual Capacity', highlight: true },
+    { value: '100K+', label: 'Proud Customers' },
+    { value: '40K Sets', label: 'Annual Sales' },
+    { value: '2', label: 'Regional Hubs' }
+  ];
 
-      {/* Navbar */}
-      <nav className="relative z-20 flex items-center justify-between px-6 py-6 max-w-7xl mx-auto">
-        <div className="flex items-center gap-3">
-          <img src={logoSrc} alt="Logo" className="h-10 w-10 object-cover rounded" />
-          <div className="flex flex-col">
-            <span className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              KINGLION
-            </span>
-            <span className="text-xs text-slate-400">Manufacturing Excellence</span>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-white via-neutral-50 to-red-100/60">
+      {/* Navigation */}
+      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-neutral-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src={logoSrc} alt="KINGLION" className="h-10 w-10 object-cover rounded" />
+            <div>
+              <h1 className="text-xl font-bold text-neutral-900">KINGLION</h1>
+              <p className="text-xs text-neutral-500">Manufacturing Excellence</p>
+            </div>
           </div>
+          <Button 
+            onClick={() => navigate('/login')}
+            className="!bg-gradient-to-r !from-neutral-900 !to-red-800 !text-white hover:!from-black hover:!to-red-900"
+          >
+            Staff Portal
+          </Button>
         </div>
-        <Button 
-          onClick={() => navigate('/login')}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          Staff Login
-        </Button>
       </nav>
 
       {/* Hero Section */}
-      <div className="relative z-10 max-w-7xl mx-auto px-6 py-24 md:py-32">
-        <div className={`text-center transform transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/20 border border-blue-400/30 rounded-full mb-8 animate-fade-in">
-            <Sparkles className="w-4 h-4 text-blue-300" />
-            <span className="text-sm text-blue-200">Established 2016 • 150,000MT Annual Capacity • EAC Leader</span>
+      <section className="max-w-7xl mx-auto px-6 py-16 md:py-24">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+          {/* Left: Content */}
+          <div className="space-y-6">
+            <div className="inline-block">
+              <span className="px-4 py-2 bg-gradient-to-r from-red-100 to-neutral-100 border border-red-200 rounded-full text-sm font-medium text-red-700">
+                ✓ Eastern & Central Africa Leader
+              </span>
+            </div>
+
+            <h1 className="text-5xl md:text-6xl font-bold text-neutral-900 leading-tight">
+              Africa's Premier <span className="text-gradient bg-gradient-to-r from-red-600 to-neutral-900 bg-clip-text text-transparent">Steel & Assembly</span> Manufacturer
+            </h1>
+
+            <p className="text-lg text-neutral-600 leading-relaxed max-w-2xl">
+              KINGLION INVESTMENT COMPANY LIMITED - Established 2016. Manufacturing roofing sheets, motorcycles, three-wheelers, printer cartridges, and solar energy solutions with 150,000MT annual capacity. Over 100,000 satisfied customers across Tanzania and Rwanda.
+            </p>
+
+            <div className="flex gap-4 pt-4">
+              <Button 
+                onClick={() => navigate('/login')}
+                size="lg"
+                className="!bg-gradient-to-r !from-neutral-900 !to-red-800 !text-white hover:!from-black hover:!to-red-900 shadow-lg"
+              >
+                Access Dashboard
+                <ArrowRight className="w-5 h-5 ml-2" />
+              </Button>
+              <Button 
+                onClick={() => document.getElementById('products').scrollIntoView({ behavior: 'smooth' })}
+                size="lg"
+                variant="outline"
+                className="border-neutral-300 text-neutral-700 hover:bg-neutral-50"
+              >
+                Learn More
+              </Button>
+            </div>
           </div>
 
-          {/* Main Heading */}
-          <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
-            <span className="block mb-2">Africa's Leading</span>
-            <span className="block bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent animate-pulse">
-              Steel & Assembly Manufacturing
-            </span>
-          </h1>
+          {/* Right: Logo & Stats */}
+          <div className="space-y-8">
+            <Card className="shadow-xl border-0 !bg-white">
+              <CardContent className="pt-8 flex justify-center">
+                <img src={logoSrc} alt="KINGLION" className="h-48 w-auto object-contain" />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
-          {/* Subheading */}
-          <p className="text-xl md:text-2xl text-slate-300 max-w-3xl mx-auto mb-12 leading-relaxed">
-            KINGLION INVESTMENT COMPANY LIMITED - Proudly manufacturing roofing sheets, motorcycles, three-wheelers, and solar energy solutions across Eastern and Central Africa since 2016. Over 100,000 satisfied customers across Tanzania and Rwanda.
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-16">
+          {stats.map((stat, idx) => (
+            <Card key={idx} className={`border-0 shadow-md ${stat.highlight ? '!bg-gradient-to-br !from-red-50 !to-neutral-50 border border-red-200' : '!bg-white'}`}>
+              <CardContent className="pt-6">
+                <div className="text-3xl font-bold text-neutral-900 mb-1">{stat.value}</div>
+                <p className="text-sm text-neutral-600">{stat.label}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      {/* Products Section */}
+      <section id="products" className="bg-white py-16 md:py-24 border-t border-neutral-200">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold text-neutral-900 mb-4">
+              Our Products & Services
+            </h2>
+            <p className="text-lg text-neutral-600 max-w-2xl mx-auto">
+              Comprehensive manufacturing and assembly solutions across Eastern and Central Africa
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {products.map((product, idx) => {
+              const Icon = product.icon;
+              return (
+                <Card key={idx} className="border-0 shadow-md hover:shadow-lg transition-shadow hover:border-red-200 border border-neutral-200">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 bg-gradient-to-br from-red-100 to-neutral-100 rounded-lg">
+                        <Icon className="w-6 h-6 text-red-700" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-neutral-900 mb-1">{product.title}</h3>
+                        <p className="text-sm text-neutral-600">{product.description}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Facilities Section */}
+      <section className="py-16 md:py-24 bg-gradient-to-br from-white via-neutral-50 to-red-100/60">
+        <div className="max-w-7xl mx-auto px-6">
+          <h2 className="text-4xl font-bold text-neutral-900 mb-12 text-center">
+            Our Facilities
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Tanzania */}
+            <Card className="border-0 shadow-lg !bg-white">
+              <CardHeader>
+                <div className="flex items-center gap-3 mb-2">
+                  <Globe className="w-6 h-6 text-red-700" />
+                  <CardTitle className="!text-neutral-900">Tanzania Operations</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <p className="font-semibold text-neutral-900">Dar es Salaam</p>
+                  <p className="text-sm text-neutral-600">Headquarters & Main Manufacturing Plant</p>
+                </div>
+                <div className="border-t border-neutral-200 pt-3">
+                  <p className="text-sm text-neutral-600"><span className="font-medium text-neutral-900">Established:</span> 2016</p>
+                  <p className="text-sm text-neutral-600"><span className="font-medium text-neutral-900">Capacity:</span> 150,000MT per annum</p>
+                  <p className="text-sm text-neutral-600"><span className="font-medium text-neutral-900">Products:</span> Roofing sheets, Motorcycles, Three-wheelers</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Rwanda */}
+            <Card className="border-0 shadow-lg !bg-white">
+              <CardHeader>
+                <div className="flex items-center gap-3 mb-2">
+                  <Globe className="w-6 h-6 text-red-700" />
+                  <CardTitle className="!text-neutral-900">Rwanda Operations</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <p className="font-semibold text-neutral-900">Kigali</p>
+                  <p className="text-sm text-neutral-600">Regional Assembly & Distribution Hub</p>
+                </div>
+                <div className="border-t border-neutral-200 pt-3">
+                  <p className="text-sm text-neutral-600"><span className="font-medium text-neutral-900">Established:</span> 2022</p>
+                  <p className="text-sm text-neutral-600"><span className="font-medium text-neutral-900">Focus:</span> Market Expansion</p>
+                  <p className="text-sm text-neutral-600"><span className="font-medium text-neutral-900">Role:</span> EAC Market Leader</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="bg-gradient-to-r from-neutral-900 via-red-900 to-neutral-900 py-16 md:py-20">
+        <div className="max-w-4xl mx-auto px-6 text-center space-y-6">
+          <h2 className="text-4xl font-bold text-white">
+            Ready to Optimize Your Operations?
+          </h2>
+          <p className="text-lg text-neutral-200 max-w-2xl mx-auto">
+            Access KINGLION's management platform to streamline operations, track inventory, and maximize efficiency across all facilities.
           </p>
-
-          {/* CTA Button */}
-          <div className="flex gap-4 justify-center mb-24">
+          <div className="pt-4">
             <Button 
               onClick={() => navigate('/login')}
               size="lg"
-              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-6 text-lg group"
+              className="!bg-white !text-neutral-900 hover:!bg-neutral-100 font-semibold shadow-lg"
             >
-              Get Started
-              <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-            </Button>
-            <Button 
-              onClick={() => document.getElementById('features').scrollIntoView({ behavior: 'smooth' })}
-              size="lg"
-              variant="outline"
-              className="px-8 py-6 text-lg border-slate-400 text-slate-200 hover:bg-slate-700"
-            >
-              Learn More
+              Staff Portal Login
+              <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
           </div>
-
-          {/* Hero Image/Stats */}
-          <div className="grid grid-cols-3 gap-8 max-w-2xl mx-auto mb-24 text-center">
-            <div className="p-6 bg-slate-700/30 backdrop-blur border border-slate-600 rounded-lg hover:border-blue-400/50 transition-colors">
-              <div className="text-3xl font-bold text-blue-300 mb-2">150K MT</div>
-              <p className="text-sm text-slate-400">Annual Capacity</p>
-            </div>
-            <div className="p-6 bg-slate-700/30 backdrop-blur border border-slate-600 rounded-lg hover:border-purple-400/50 transition-colors">
-              <div className="text-3xl font-bold text-purple-300 mb-2">100K+</div>
-              <p className="text-sm text-slate-400">Proud Owners</p>
-            </div>
-            <div className="p-6 bg-slate-700/30 backdrop-blur border border-slate-600 rounded-lg hover:border-pink-400/50 transition-colors">
-              <div className="text-3xl font-bold text-pink-300 mb-2">40K Sets</div>
-              <p className="text-sm text-slate-400">Annual Sales</p>
-            </div>
-          </div>
         </div>
-      </div>
-
-      {/* Features Section */}
-      <div id="features" className="relative z-10 max-w-7xl mx-auto px-6 py-24 md:py-32">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">
-            Our <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Core Products & Services</span>
-          </h2>
-          <p className="text-xl text-slate-400 max-w-2xl mx-auto">
-            Established in 2016, KINGLION has become Eastern and Central Africa's trusted manufacturer of quality products
-          </p>
-        </div>
-
-        {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {features.map((feature, index) => {
-            const Icon = feature.icon;
-            return (
-              <div
-                key={index}
-                className={`group p-8 bg-slate-700/30 backdrop-blur border border-slate-600 rounded-xl hover:border-blue-400/50 hover:bg-slate-700/50 transition-all duration-500 transform ${
-                  isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-                }`}
-                style={{
-                  transitionDelay: isLoaded ? `${index * 100}ms` : '0ms'
-                }}
-              >
-                <div className="inline-block p-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg mb-4 group-hover:scale-110 transition-transform">
-                  <Icon className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-xl font-bold mb-3 text-white">{feature.title}</h3>
-                <p className="text-slate-400 leading-relaxed">{feature.description}</p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* CTA Section */}
-      <div className="relative z-10 max-w-4xl mx-auto px-6 py-24">
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-12 md:p-16 text-center">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6 text-white">Join Our Growing Family</h2>
-          <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
-            Access KINGLION's management platform to streamline operations, track inventory, and optimize your manufacturing workflow across our facilities.
-          </p>
-          <Button 
-            onClick={() => navigate('/login')}
-            size="lg"
-            className="bg-white hover:bg-slate-100 text-blue-600 font-semibold px-8 py-6 text-lg"
-          >
-            Access Management Dashboard
-            <ArrowRight className="w-5 h-5 ml-2" />
-          </Button>
-        </div>
-      </div>
+      </section>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-slate-700 mt-24 py-12 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-            <div>
-              <h3 className="text-white font-bold mb-2">KINGLION INVESTMENT COMPANY LIMITED</h3>
-              <p className="text-slate-400 text-sm">Eastern and Central Africa's trusted manufacturer of quality steel products, motorcycles, and renewable energy solutions.</p>
+      <footer className="bg-neutral-900 text-neutral-300 border-t border-neutral-800">
+        <div className="max-w-7xl mx-auto px-6 py-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-8">
+            <div className="space-y-2">
+              <h3 className="font-bold text-white">KINGLION INVESTMENT COMPANY LIMITED</h3>
+              <p className="text-sm leading-relaxed">
+                Africa's trusted manufacturer of quality steel products, motorcycles, and renewable energy solutions.
+              </p>
             </div>
             <div>
-              <h3 className="text-white font-bold mb-2">Tanzania Operations</h3>
-              <p className="text-slate-400 text-sm">Dar es Salaam, Tanzania<br/>Since 2016<br/>150,000MT Annual Capacity</p>
+              <h4 className="font-semibold text-white mb-3">Quick Links</h4>
+              <ul className="space-y-2 text-sm">
+                <li><a href="#products" className="hover:text-white transition-colors">Products</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">About Us</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
+              </ul>
             </div>
             <div>
-              <h3 className="text-white font-bold mb-2">Rwanda Operations</h3>
-              <p className="text-slate-400 text-sm">Kigali, Rwanda<br/>Expanding Since 2022<br/>EAC Market Leader</p>
+              <h4 className="font-semibold text-white mb-3">Locations</h4>
+              <ul className="space-y-2 text-sm">
+                <li>Dar es Salaam, Tanzania</li>
+                <li>Kigali, Rwanda</li>
+                <li>EAC Region Operations</li>
+              </ul>
             </div>
           </div>
-          <div className="border-t border-slate-700 pt-8 flex flex-col md:flex-row justify-between items-center text-slate-400">
-            <div className="mb-6 md:mb-0">
-              <p>&copy; 2016-2026 KINGLION INVESTMENT COMPANY LIMITED. All rights reserved.</p>
-            </div>
-            <div className="flex gap-8">
-              <a href="#" className="hover:text-white transition-colors">Privacy</a>
-              <a href="#" className="hover:text-white transition-colors">Terms</a>
-              <a href="#" className="hover:text-white transition-colors">Contact</a>
+          
+          <div className="border-t border-neutral-800 pt-8 flex flex-col md:flex-row justify-between items-center text-sm">
+            <p>&copy; 2016-2026 KINGLION INVESTMENT COMPANY LIMITED. All rights reserved.</p>
+            <div className="flex gap-6 mt-4 md:mt-0">
+              <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
+              <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
             </div>
           </div>
         </div>
       </footer>
-
-      {/* Tailwind Animation Styles */}
-      <style>{`
-        @keyframes blob {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(30px, -50px) scale(1.1); }
-          66% { transform: translate(-20px, 20px) scale(0.9); }
-        }
-        
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-        
-        .animate-fade-in {
-          animation: fadeIn 1s ease-in-out;
-        }
-      `}</style>
     </div>
   );
 }
