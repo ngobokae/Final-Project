@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ConfirmDialogProvider } from './contexts/ConfirmDialogContext';
 import { useEffect } from 'react';
+import Landing from './pages/Landing';
 import Login from './pages/auth/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLayout from './layouts/AdminLayout';
@@ -85,6 +86,7 @@ function AppContent() {
     <>
       <CommandPalette />
       <Routes>
+        <Route path="/" element={user ? <Navigate to={`/${user.role}`} replace /> : <Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/forget-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
@@ -159,7 +161,8 @@ function AppContent() {
           <Route path="messages" element={<Messages />} />
         </Route>
 
-        <Route path="/" element={user ? <Navigate to={`/${user.role}`} replace /> : <Navigate to="/login" replace />} />
+        {/* Catch-all redirect */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   );
