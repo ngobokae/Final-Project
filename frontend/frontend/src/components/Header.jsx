@@ -46,7 +46,7 @@ export default function Header() {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/');
   };
 
   const formatRelativeTime = (d) => {
