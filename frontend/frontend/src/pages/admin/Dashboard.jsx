@@ -5,21 +5,15 @@ import { Progress } from '../../components/ui/progress';
 import { Button } from '../../components/ui/button';
 import {
   Users, Upload, Brain, Activity, AlertTriangle, CheckCircle, TrendingUp, TrendingDown,
-  ArrowRight, Server, Database, Clock, UserPlus, FileText, Settings, Shield, Zap,
-  Circle, Key, Laptop, Globe
+  ArrowRight, Clock, Shield, Zap, Circle
 } from 'lucide-react';
 import {
-  AreaChart, Area, BarChart as RechartsBarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  BarChart as RechartsBarChart, Bar,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { apiGet, apiDelete, API_BASE_URL } from '../../utils/api';
+import { apiGet } from '../../utils/api';
 import { useNavigate } from 'react-router-dom';
 
-const TIME_RANGES = [
-  { id: '1d', label: '24h', days: 1 },
-  { id: '7d', label: '7 days', days: 7 },
-  { id: '30d', label: '30 days', days: 30 },
-];
 
 function formatTrend(pct) {
   if (pct === 0 || pct == null) return { change: '—', trend: 'neutral' };
@@ -41,7 +35,6 @@ function ServiceDot({ ok, label }) {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [timeRange, setTimeRange] = useState('30d');
   const [activityFilter, setActivityFilter] = useState('all');
   const [stats, setStats] = useState({
     totalUsers: 0, activeUsers: 0, dataUploads: 0, recentUploads: 0,
@@ -49,31 +42,24 @@ export default function AdminDashboard() {
     userChangePct: 0, uploadChangePct: 0, healthChangePct: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [userGrowthData, setUserGrowthData] = useState([]);
-  const [roleDistribution, setRoleDistribution] = useState([]);
   const [dataUploadTrend, setDataUploadTrend] = useState([]);
   const [aiModels, setAiModels] = useState([]);
   const [systemAlerts, setSystemAlerts] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
-  const [usersNeedingAttention, setUsersNeedingAttention] = useState([]);
   const [security, setSecurity] = useState({ loginsToday: 0, loginsThisWeek: 0, failedLoginsWeek: 0 });
   const [services, setServices] = useState({ database: true, api: true, ml: false });
-  const [activeSessions, setActiveSessions] = useState([]);
-  const [sessionsLoading, setSessionsLoading] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
-  }, [timeRange]);
+  }, []);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const days = TIME_RANGES.find((t) => t.id === timeRange)?.days || 30;
 
-      const [adminData, healthData, sessionsData] = await Promise.all([
-        apiGet(`/api/admin/dashboard?days=${days}`).catch(() => ({})),
+      const [adminData, healthData] = await Promise.all([
+        apiGet('/api/admin/dashboard?days=30').catch(() => ({})),
         apiGet('/api/admin/health-status').catch(() => ({ services: {} })),
-        apiGet('/api/admin/sessions').catch(() => ({ success: false, sessions: [] })),
       ]);
 
       const usersBlock = adminData.users || {};
@@ -95,9 +81,6 @@ export default function AdminDashboard() {
         healthChangePct: adminData.healthChangePct ?? 0,
       });
 
-      setUserGrowthData(usersBlock.growth?.length ? usersBlock.growth : []);
-      setRoleDistribution(usersBlock.roleDistribution || []);
-      setUsersNeedingAttention(usersBlock.needingAttention || []);
       setSecurity(adminData.security || { loginsToday: 0, loginsThisWeek: 0, failedLoginsWeek: 0 });
       setServices({
         database: svc.database?.ok ?? svc.database ?? true,
@@ -114,7 +97,6 @@ export default function AdminDashboard() {
         name: m.name,
         status: m.active !== false ? 'Active' : 'Inactive',
         accuracy: Number(m.accuracy || 0).toFixed(1),
-        color: m.active !== false ? 'green' : 'gray',
       })));
 
       setSystemAlerts((adminData.alerts || []).map((a) => ({
@@ -122,7 +104,6 @@ export default function AdminDashboard() {
         title: a.alert_type || 'System Alert',
         description: a.message || '',
         time: new Date(a.created_at).toLocaleString(),
-        severity: a.severity,
         color: a.severity === 'critical' || a.severity === 'high' ? 'amber' : 'green',
       })));
 
@@ -136,9 +117,6 @@ export default function AdminDashboard() {
         color: row.action?.includes('UPLOAD') ? 'green' : row.action?.includes('LOGIN') ? 'blue' : row.action?.includes('CREATE') ? 'blue' : 'purple',
       })));
 
-      if (sessionsData && sessionsData.success) {
-        setActiveSessions(sessionsData.sessions || []);
-      }
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
     } finally {
@@ -146,25 +124,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleRevokeSession = async (sessionId) => {
-    if (!window.confirm('Are you sure you want to revoke this user session? The user will be logged out immediately.')) {
-      return;
-    }
-    try {
-      setSessionsLoading(true);
-      const res = await apiDelete(`/api/admin/sessions/${sessionId}`);
-      if (res.success) {
-        const refreshed = await apiGet('/api/admin/sessions');
-        if (refreshed.success) {
-          setActiveSessions(refreshed.sessions || []);
-        }
-      }
-    } catch (e) {
-      alert(e.message || 'Failed to revoke session');
-    } finally {
-      setSessionsLoading(false);
-    }
-  };
 
   const userTrend = formatTrend(stats.userChangePct);
   const uploadTrendBadge = formatTrend(stats.uploadChangePct);
@@ -192,20 +151,8 @@ export default function AdminDashboard() {
       icon: Upload,
       bgGradient: 'from-emerald-500/10 to-emerald-600/10',
       iconBg: 'bg-emerald-500',
-      to: '/admin/audit-logs?view=uploads',
+      to: '/admin/audit-logs?view=uploads&action=uploads',
       hint: 'View upload activity',
-    },
-    {
-      title: 'AI Models',
-      value: stats.aiModels,
-      change: 'Stable',
-      trend: 'neutral',
-      subtitle: `${stats.activeModels} actively running`,
-      icon: Brain,
-      bgGradient: 'from-purple-500/10 to-purple-600/10',
-      iconBg: 'bg-purple-500',
-      to: '/admin/ai-models',
-      hint: 'Manage AI models',
     },
     {
       title: 'System Health',
@@ -241,24 +188,11 @@ export default function AdminDashboard() {
     return recentActivity.filter((a) => a.action === activityFilter);
   }, [recentActivity, activityFilter]);
 
-  const handleExportDb = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/admin/db-export`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) throw new Error('Export failed');
-      const data = await response.json();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `kinglion-db-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      alert(e.message || 'Failed to export database');
-    }
+  const visibleActivity = filteredActivity.slice(0, 6);
+
+  const getSecurityFilterRoute = (type) => {
+    if (type === 'failed') return '/admin/audit-logs?view=failed-logins';
+    return '/admin/audit-logs?view=logins';
   };
 
   const handleMetricClick = (to) => navigate(to);
@@ -287,35 +221,12 @@ export default function AdminDashboard() {
           <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-neutral-100 dark:to-neutral-400 bg-clip-text text-transparent">
             Admin Dashboard
           </h1>
-          <p className="text-gray-500 mt-2">System overview and management center</p>
+          <p className="text-gray-500 mt-2">Simple, focused operations overview</p>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
-          <div className="flex rounded-lg border border-gray-200 dark:border-neutral-700 overflow-hidden">
-            {TIME_RANGES.map((tr) => (
-              <button
-                key={tr.id}
-                type="button"
-                onClick={() => setTimeRange(tr.id)}
-                className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  timeRange === tr.id
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white dark:bg-neutral-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-neutral-800'
-                }`}
-              >
-                {tr.label}
-              </button>
-            ))}
-          </div>
           <Button variant="outline" className="gap-2" onClick={fetchDashboardData}>
             <Clock className="w-4 h-4" />
             Refresh
-          </Button>
-          <Button
-            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/30"
-            onClick={() => navigate('/admin/audit-logs')}
-          >
-            <Server className="w-4 h-4 mr-2" />
-            System Report
           </Button>
         </div>
       </div>
@@ -327,26 +238,8 @@ export default function AdminDashboard() {
         <ServiceDot ok={services.ml} label="ML Service" />
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <span className="text-xs font-bold uppercase tracking-wider text-gray-500 self-center mr-1">Quick actions</span>
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate('/admin/users', { state: { openCreate: true } })}>
-          <UserPlus className="w-4 h-4" /> Add user
-        </Button>
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExportDb}>
-          <Database className="w-4 h-4" /> Export DB
-        </Button>
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate('/admin/audit-logs')}>
-          <FileText className="w-4 h-4" /> Audit logs
-        </Button>
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate('/admin/ai-models')}>
-          <Brain className="w-4 h-4" /> AI models
-        </Button>
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate('/admin/system-settings')}>
-          <Settings className="w-4 h-4" /> Settings
-        </Button>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {metrics.map((metric, idx) => {
           const Icon = metric.icon;
           const TrendIcon = metric.trend === 'up' ? TrendingUp : metric.trend === 'down' ? TrendingDown : Activity;
@@ -398,136 +291,33 @@ export default function AdminDashboard() {
             <CardDescription>Login activity (last 7 days)</CardDescription>
           </CardHeader>
           <CardContent className="p-6 grid grid-cols-3 gap-4">
-            <div className="text-center p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30">
-              <p className="text-2xl font-bold text-blue-600">{security.loginsToday}</p>
-              <p className="text-xs text-gray-500 mt-1">Logins today</p>
-            </div>
-            <div className="text-center p-3 rounded-xl bg-green-50 dark:bg-green-950/30">
-              <p className="text-2xl font-bold text-green-600">{security.loginsThisWeek}</p>
-              <p className="text-xs text-gray-500 mt-1">This week</p>
-            </div>
-            <div className="text-center p-3 rounded-xl bg-red-50 dark:bg-red-950/30">
-              <p className="text-2xl font-bold text-red-600">{security.failedLoginsWeek}</p>
-              <p className="text-xs text-gray-500 mt-1">Failed attempts</p>
-            </div>
+            <button
+            type="button"
+            onClick={() => navigate(getSecurityFilterRoute('today'))}
+            className="text-left text-center p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors"
+          >
+            <p className="text-2xl font-bold text-blue-600">{security.loginsToday}</p>
+            <p className="text-xs text-gray-500 mt-1">Logins today</p>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(getSecurityFilterRoute('week'))}
+            className="text-left text-center p-3 rounded-xl bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-900 transition-colors"
+          >
+            <p className="text-2xl font-bold text-green-600">{security.loginsThisWeek}</p>
+            <p className="text-xs text-gray-500 mt-1">This week</p>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(getSecurityFilterRoute('failed'))}
+            className="text-left text-center p-3 rounded-xl bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-900 transition-colors"
+          >
+            <p className="text-2xl font-bold text-red-600">{security.failedLoginsWeek}</p>
+            <p className="text-xs text-gray-500 mt-1">Failed attempts</p>
+          </button>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2 border-0 shadow-lg">
-          <CardHeader className="border-b dark:border-neutral-700 flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Users className="w-5 h-5 text-amber-500" />
-                Users needing attention
-              </CardTitle>
-              <CardDescription>Inactive, no 2FA, or stale logins</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => navigate('/admin/users')}>Manage</Button>
-          </CardHeader>
-          <CardContent className="p-4 max-h-48 overflow-y-auto">
-            {usersNeedingAttention.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-6">All users look good.</p>
-            ) : (
-              <ul className="space-y-2">
-                {usersNeedingAttention.map((u) => (
-                  <li
-                    key={u.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => navigate(`/admin/users?highlight=${u.id}`)}
-                    onKeyDown={(e) => e.key === 'Enter' && navigate(`/admin/users?highlight=${u.id}`)}
-                    className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-800 cursor-pointer text-sm"
-                  >
-                    <div>
-                      <p className="font-semibold text-gray-900 dark:text-gray-100">{u.name}</p>
-                      <p className="text-xs text-gray-500">{u.email}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-1 justify-end max-w-[50%]">
-                      {u.reasons?.map((r) => (
-                        <Badge key={r} variant="outline" className="text-[10px]">{r}</Badge>
-                      ))}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="border-0 shadow-lg lg:col-span-2">
-          <CardHeader className="border-b dark:border-neutral-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-xl flex items-center gap-2">
-                  <Users className="w-5 h-5 text-blue-500" />
-                  User growth
-                </CardTitle>
-                <CardDescription>Cumulative users (6 months)</CardDescription>
-              </div>
-              <Badge className="border">
-                <TrendingUp className="w-3 h-3 mr-1" />
-                {userTrend.change}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            {userGrowthData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <AreaChart data={userGrowthData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} />
-                  <YAxis stroke="#9ca3af" fontSize={12} />
-                  <Tooltip />
-                  <Legend />
-                  <Area type="monotone" dataKey="users" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} name="Total" />
-                  <Area type="monotone" dataKey="active" stroke="#10b981" fill="#10b981" fillOpacity={0.15} name="Active est." />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-center text-gray-500 py-12 text-sm">No growth data yet</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-lg">
-          <CardHeader className="border-b dark:border-neutral-700">
-            <CardTitle className="text-xl flex items-center gap-2">
-              <Users className="w-5 h-5 text-purple-500" />
-              Users by role
-            </CardTitle>
-            <CardDescription>Click a segment to filter users</CardDescription>
-          </CardHeader>
-          <CardContent className="p-4">
-            {roleDistribution.length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={roleDistribution}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={2}
-                    onClick={(data) => data?.role && navigate(`/admin/users?role=${data.role}`)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    {roleDistribution.map((entry) => (
-                      <Cell key={entry.role} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-center text-gray-500 py-12 text-sm">No users</p>
-            )}
-          </CardContent>
-        </Card>
       </div>
 
       <Card className="border-0 shadow-lg">
@@ -658,127 +448,36 @@ export default function AdminDashboard() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-6">
+        <CardContent className="p-6 max-h-80 overflow-y-auto">
           {filteredActivity.length === 0 ? (
             <p className="text-sm text-gray-500 text-center py-8">No matching activity</p>
           ) : (
-            <div className="space-y-2">
-              {filteredActivity.map((activity) => (
-                <div
-                  key={activity.id || activity.time + activity.title}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => navigate('/admin/audit-logs')}
-                  className="flex items-start gap-4 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-neutral-800 cursor-pointer"
-                >
-                  <div className={`w-2 h-2 rounded-full mt-2 ${
-                    activity.color === 'green' ? 'bg-green-500' : activity.color === 'blue' ? 'bg-blue-500' : 'bg-purple-500'
-                  }`} />
-                  <div className="flex-1">
-                    <p className="font-semibold text-sm">{activity.title}</p>
-                    <p className="text-sm text-gray-500">{activity.description}</p>
-                    <p className="text-xs text-gray-400 mt-1">{activity.time}</p>
+            <>
+              {filteredActivity.length > visibleActivity.length && (
+                <p className="text-xs text-gray-500 mb-3">Showing latest {visibleActivity.length} of {filteredActivity.length} events.</p>
+              )}
+              <div className="space-y-2">
+                {visibleActivity.map((activity) => (
+                  <div
+                    key={activity.id || activity.time + activity.title}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => navigate('/admin/audit-logs')}
+                    className="flex items-start gap-4 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-neutral-800 cursor-pointer"
+                  >
+                    <div className={`w-2 h-2 rounded-full mt-2 ${
+                      activity.color === 'green' ? 'bg-green-500' : activity.color === 'blue' ? 'bg-blue-500' : 'bg-purple-500'
+                    }`} />
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm">{activity.title}</p>
+                      <p className="text-sm text-gray-500">{activity.description}</p>
+                      <p className="text-xs text-gray-400 mt-1">{activity.time}</p>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-gray-400" />
                   </div>
-                  <ArrowRight className="w-4 h-4 text-gray-400" />
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="border-0 shadow-lg">
-        <CardHeader className="border-b dark:border-neutral-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <CardTitle className="text-xl flex items-center gap-2">
-              <Key className="w-5 h-5 text-red-500" />
-              Active User Sessions & Control
-            </CardTitle>
-            <CardDescription>Monitor logged-in sessions and revoke access instantly if needed.</CardDescription>
-          </div>
-          {sessionsLoading && (
-            <Badge variant="outline" className="animate-pulse bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400">
-              Updating...
-            </Badge>
-          )}
-        </CardHeader>
-        <CardContent className="p-0 overflow-x-auto">
-          {activeSessions.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-12">No active sessions found.</p>
-          ) : (
-            <table className="w-full text-sm text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-neutral-900 border-b border-gray-100 dark:border-neutral-800 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  <th className="p-4 pl-6">User / Role</th>
-                  <th className="p-4">Device</th>
-                  <th className="p-4">IP Address</th>
-                  <th className="p-4">Last Active</th>
-                  <th className="p-4 pr-6 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-neutral-800">
-                {activeSessions.map((session) => {
-                  const roleColors = {
-                    admin: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-400',
-                    operations: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400',
-                    inventory: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400',
-                    executive: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400'
-                  };
-                  const roleColor = roleColors[session.userRole] || 'bg-gray-100 text-gray-700 border-gray-200';
-                  
-                  return (
-                    <tr key={session.id} className="hover:bg-gray-50/50 dark:hover:bg-neutral-900/50 transition-colors">
-                      <td className="p-4 pl-6">
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                            {session.userName}
-                            {session.current && (
-                              <Badge className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded">You</Badge>
-                            )}
-                          </span>
-                          <div className="flex items-center gap-1.5 mt-1">
-                            <span className="text-xs text-gray-500">{session.userEmail}</span>
-                            <span className={`text-[10px] uppercase font-bold px-1.5 py-0.2 rounded border ${roleColor}`}>
-                              {session.userRole}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4 text-gray-700 dark:text-gray-300">
-                        <div className="flex items-center gap-2">
-                          <Laptop className="w-4 h-4 text-gray-400 shrink-0" />
-                          <span className="truncate max-w-[200px]">{session.device || 'Unknown Browser'}</span>
-                        </div>
-                      </td>
-                      <td className="p-4 text-gray-700 dark:text-gray-300 font-mono text-xs">
-                        <div className="flex items-center gap-2">
-                          <Globe className="w-4 h-4 text-gray-400 shrink-0" />
-                          <span>{session.ip || 'Localhost'}</span>
-                        </div>
-                      </td>
-                      <td className="p-4 text-xs text-gray-500">
-                        {new Date(session.lastActive).toLocaleString()}
-                      </td>
-                      <td className="p-4 pr-6 text-right">
-                        {session.current ? (
-                          <span className="text-xs text-gray-400 italic font-medium">Active Session</span>
-                        ) : (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            disabled={sessionsLoading}
-                            onClick={() => handleRevokeSession(session.id)}
-                            className="bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/30 dark:hover:bg-red-950/50 border border-red-200 dark:border-red-900 hover:text-red-700 text-xs px-2.5 py-1 rounded"
-                          >
-                            Revoke
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

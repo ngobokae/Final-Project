@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { generateBusinessReport } from '../../utils/reportGenerator';
 import { apiGet } from '../../utils/api';
 import { formatCurrency } from '../../utils/currency';
-import { downloadCsvReport } from '../../utils/reportExport';
+import { downloadCsvReport, downloadExcelReport } from '../../utils/reportExport';
 
 export default function ExecutiveReports() {
   const { user } = useAuth();
@@ -15,6 +15,7 @@ export default function ExecutiveReports() {
   const [lastGeneratedReportId, setLastGeneratedReportId] = useState('');
   const [metrics, setMetrics] = useState(null);
   const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [selectedMetric, setSelectedMetric] = useState(null);
 
   const reports = [
     {
@@ -92,6 +93,17 @@ export default function ExecutiveReports() {
     } catch (error) {
       console.error('Failed to download report CSV:', error);
       alert('Failed to download report CSV.');
+    }
+  };
+
+  const handleDownloadExcel = async (reportId) => {
+    try {
+      const result = await fetchReportById(reportId);
+      if (!result) return;
+      await downloadExcelReport(result.reportData, `${result.reportConfig.name} Report`, `${reportId}-report`);
+    } catch (error) {
+      console.error('Failed to download Excel report:', error);
+      alert('Failed to download Excel report.');
     }
   };
 
@@ -199,15 +211,22 @@ export default function ExecutiveReports() {
               <div className="mt-4 flex gap-2">
                 <button
                   onClick={() => handleDownloadCsv(report.id)}
-                  className="flex-1 px-3 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors flex items-center justify-center gap-2 text-sm"
+                  className="flex-1 min-w-[140px] px-3 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors flex items-center justify-center gap-2 text-sm"
                 >
                   <Download className="w-4 h-4" />
                   Download CSV
                 </button>
                 <button
+                  onClick={() => handleDownloadExcel(report.id)}
+                  className="flex-1 min-w-[140px] px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors flex items-center justify-center gap-2 text-sm"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Excel
+                </button>
+                <button
                   onClick={handleDownloadPdf}
                   disabled={pdfGenerating}
-                  className="flex-1 px-3 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                  className="flex-1 min-w-[140px] px-3 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-50"
                 >
                   {pdfGenerating ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -224,16 +243,36 @@ export default function ExecutiveReports() {
 
       {/* Quick Metrics */}
       <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">This Month at a Glance</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">This Month at a Glance</h2>
+          {selectedMetric && (
+            <button
+              onClick={() => setSelectedMetric(null)}
+              className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition"
+            >
+              Clear Selection
+            </button>
+          )}
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="p-4 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg">
+          <div 
+            onClick={() => setSelectedMetric(selectedMetric === 'revenue' ? null : 'revenue')}
+            className={`p-4 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg cursor-pointer transition-all hover:scale-105 hover:shadow-md ${
+              selectedMetric === 'revenue' ? 'ring-2 ring-emerald-500 shadow-lg' : ''
+            }`}
+          >
             <div className="text-sm text-emerald-600 font-medium">Total Revenue</div>
             <div className="text-2xl font-bold text-emerald-900">
               {formatCurrency(metrics?.revenue || 0)}
             </div>
             <div className="text-xs text-emerald-600 mt-1">Last 30 days</div>
           </div>
-          <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg">
+          <div 
+            onClick={() => setSelectedMetric(selectedMetric === 'profit' ? null : 'profit')}
+            className={`p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg cursor-pointer transition-all hover:scale-105 hover:shadow-md ${
+              selectedMetric === 'profit' ? 'ring-2 ring-blue-500 shadow-lg' : ''
+            }`}
+          >
             <div className="text-sm text-blue-600 font-medium">Gross Profit</div>
             <div className="text-2xl font-bold text-blue-900">
               {formatCurrency(metrics?.profit || 0)}
@@ -242,12 +281,22 @@ export default function ExecutiveReports() {
               {metrics?.revenue ? ((metrics.profit / metrics.revenue) * 100).toFixed(1) + '% margin' : '—'}
             </div>
           </div>
-          <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg">
+          <div 
+            onClick={() => setSelectedMetric(selectedMetric === 'orders' ? null : 'orders')}
+            className={`p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg cursor-pointer transition-all hover:scale-105 hover:shadow-md ${
+              selectedMetric === 'orders' ? 'ring-2 ring-purple-500 shadow-lg' : ''
+            }`}
+          >
             <div className="text-sm text-purple-600 font-medium">Orders</div>
             <div className="text-2xl font-bold text-purple-900">{metrics?.orders?.toLocaleString() || '0'}</div>
             <div className="text-xs text-purple-600 mt-1">Last 30 days</div>
           </div>
-          <div className="p-4 bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg">
+          <div 
+            onClick={() => setSelectedMetric(selectedMetric === 'aov' ? null : 'aov')}
+            className={`p-4 bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg cursor-pointer transition-all hover:scale-105 hover:shadow-md ${
+              selectedMetric === 'aov' ? 'ring-2 ring-amber-500 shadow-lg' : ''
+            }`}
+          >
             <div className="text-sm text-amber-600 font-medium">Avg Order Value</div>
             <div className="text-2xl font-bold text-amber-900">
               {formatCurrency(metrics?.avgOrderValue || 0)}

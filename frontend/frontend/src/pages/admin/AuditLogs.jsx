@@ -21,26 +21,42 @@ const isUploadRelatedLog = (log) => {
 export default function AuditLogs() {
   const [searchParams] = useSearchParams();
   const uploadsView = searchParams.get('view') === 'uploads';
+  const failedLoginsView = searchParams.get('view') === 'failed-logins';
+  const loginsView = searchParams.get('view') === 'logins';
 
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterAction, setFilterAction] = useState(uploadsView ? 'uploads' : 'all');
+  const [filterAction, setFilterAction] = useState(
+    uploadsView ? 'uploads' : failedLoginsView ? 'LOGIN_FAILED' : loginsView ? 'LOGIN' : 'all'
+  );
 
   useEffect(() => {
     fetchLogs();
-  }, []);
+  }, [uploadsView, failedLoginsView, loginsView]);
 
   useEffect(() => {
     if (uploadsView) {
       setFilterAction('uploads');
+    } else if (failedLoginsView) {
+      setFilterAction('LOGIN_FAILED');
+    } else if (loginsView) {
+      setFilterAction('LOGIN');
     }
-  }, [uploadsView]);
+  }, [uploadsView, failedLoginsView, loginsView]);
 
   const fetchLogs = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/audit', {
+      const params = new URLSearchParams();
+      params.set('limit', uploadsView ? '100' : '50');
+      if (uploadsView) {
+        params.set('action', 'uploads');
+      } else if (failedLoginsView) {
+        params.set('action', 'LOGIN_FAILED');
+      }
+
+      const response = await fetch(`http://localhost:3001/api/audit?${params.toString()}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -85,7 +101,13 @@ export default function AuditLogs() {
       log.entity_type?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter =
       filterAction === 'all' ||
-      (filterAction === 'uploads' ? isUploadRelatedLog(log) : log.action === filterAction);
+      (filterAction === 'uploads'
+        ? isUploadRelatedLog(log)
+        : filterAction === 'LOGIN_FAILED'
+        ? log.action === 'LOGIN_FAILED'
+        : filterAction === 'LOGIN'
+        ? log.action === 'LOGIN' || log.action === 'LOGIN_2FA' || log.action === 'LOGIN_FAILED'
+        : log.action === filterAction);
     return matchesSearch && matchesFilter;
   });
 
@@ -129,6 +151,10 @@ export default function AuditLogs() {
           <p className="text-gray-500 dark:text-gray-400 mt-1">
             {uploadsView
               ? 'Upload and import activity across the system'
+              : failedLoginsView
+              ? 'Failed login attempts from the last 7 days'
+              : loginsView
+              ? 'Login activity and access events'
               : 'Track all system activities and changes'}
           </p>
         </div>

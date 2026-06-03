@@ -1,15 +1,13 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { BarChart3, Target, Lightbulb, FileText, ChevronRight, User, MessageSquare, Brain, Loader2, Download, Calculator } from 'lucide-react';
+import { BarChart3, Target, Lightbulb, FileText, ChevronRight, User, MessageSquare, Calculator } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import logoSrc from '../../assets/IMG_1472.PNG';
 import { apiGet } from '../../utils/api';
-import { generateBusinessReport } from '../../utils/reportGenerator';
 
 export default function ExecutiveSidebar() {
   const { user } = useAuth();
   const [insightsCount, setInsightsCount] = useState(0);
-  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -37,42 +35,20 @@ export default function ExecutiveSidebar() {
     };
   }, []);
 
-  const handleQuickReport = async () => {
-    setIsGenerating(true);
-    try {
-      const stats = await apiGet('/api/dashboard/stats');
-      const insightsRes = await apiGet('/api/insights?active=true');
-      const insights = Array.isArray(insightsRes) ? insightsRes : (insightsRes?.insights || []);
-      
-      await generateBusinessReport(user, stats, insights);
-    } catch (error) {
-      console.error('Report error:', error);
-      alert(`Could not generate report: ${error.message || 'Unknown error'}`);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
   const menuSections = [
     {
-      title: 'Overview',
+      title: 'Strategic Oversight',
       items: [
-        { to: '/executive/dashboard', icon: BarChart3, label: 'Dashboard', badge: null }
+        { to: '/executive/dashboard', icon: BarChart3, label: 'Dashboard', badge: null },
+        { to: '/executive/kpis', icon: Target, label: 'KPIs & Metrics', badge: null }
       ]
     },
     {
-      title: 'Analytics',
+      title: 'Performance',
       items: [
-        { to: '/executive/kpis', icon: Target, label: 'KPIs', badge: null },
-        { to: '/executive/insights', icon: Lightbulb, label: 'Insights', badge: insightsCount > 0 ? String(insightsCount) : null },
-        { to: '/executive/ai-hub', icon: Brain, label: 'AI Hub', badge: 'Active' },
-        { to: '/executive/simulator', icon: Calculator, label: 'Profit Simulator', badge: 'New' }
-      ]
-    },
-    {
-      title: 'Reports',
-      items: [
-        { to: '/executive/reports', icon: FileText, label: 'Reports', badge: null }
+        { to: '/executive/reports', icon: FileText, label: 'Reports', badge: null },
+        { to: '/executive/insights', icon: Lightbulb, label: 'AI Insights', badge: insightsCount > 0 ? String(insightsCount) : null },
+        { to: '/executive/simulator', icon: Calculator, label: 'ROI Simulator', badge: null }
       ]
     },
     {
@@ -140,20 +116,7 @@ export default function ExecutiveSidebar() {
         ))}
       </nav>
 
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-neutral-800 bg-neutral-950/80 backdrop-blur-sm space-y-3">
-        <button
-          onClick={handleQuickReport}
-          disabled={isGenerating}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-700 hover:bg-red-600 active:scale-95 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-red-900/20 disabled:opacity-50"
-        >
-          {isGenerating ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Download className="w-4 h-4" />
-          )}
-          Generate PDF Report
-        </button>
-
+      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-neutral-800 bg-neutral-950/80 backdrop-blur-sm">
         <div className="text-xs text-neutral-400 space-y-1">
           <div className="flex items-center justify-between">
             <span>Executive Portal</span>

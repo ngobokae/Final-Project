@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FileText, Download, Calendar, Package, TrendingDown, TrendingUp, BarChart3, Loader2 } from 'lucide-react';
 import { apiGet } from '../../utils/api';
-import { downloadCsvReport } from '../../utils/reportExport';
+import { downloadCsvReport, downloadExcelReport } from '../../utils/reportExport';
 
 export default function InventoryReports() {
   const [selectedReport, setSelectedReport] = useState('stock');
@@ -25,6 +25,20 @@ export default function InventoryReports() {
       icon: BarChart3,
       description: 'Total value of inventory by category',
       endpoint: '/api/reports/inventory-valuation'
+    },
+    {
+      id: 'forecast-errors',
+      name: 'Forecast Error Report',
+      icon: TrendingDown,
+      description: 'Forecast accuracy metrics with MAE, RMSE and MAPE by SKU',
+      endpoint: '/api/reports/inventory-forecast-errors'
+    },
+    {
+      id: 'abc-analysis',
+      name: 'ABC Inventory Analysis',
+      icon: BarChart3,
+      description: 'Categorize SKUs into A/B/C by inventory value importance',
+      endpoint: '/api/reports/inventory-abc-analysis'
     }
   ];
 
@@ -85,6 +99,17 @@ export default function InventoryReports() {
     } catch (error) {
       console.error('Failed to download report:', error);
       alert('Failed to download report.');
+    }
+  };
+
+  const handleDownloadExcel = async (reportId) => {
+    try {
+      const result = await fetchReportById(reportId);
+      if (!result) return;
+      await downloadExcelReport(result.reportData, `${result.reportConfig.name} Report`, `${reportId}-report`);
+    } catch (error) {
+      console.error('Failed to download Excel report:', error);
+      alert('Failed to download Excel report.');
     }
   };
 
@@ -173,13 +198,20 @@ export default function InventoryReports() {
                   </div>
                 </div>
               </div>
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex gap-2 flex-wrap">
                 <button
                   onClick={() => handleDownloadCsv(report.id)}
-                  className="flex-1 px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors flex items-center justify-center gap-2 text-sm"
+                  className="flex-1 min-w-[140px] px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors flex items-center justify-center gap-2 text-sm"
                 >
                   <Download className="w-4 h-4" />
                   Download CSV
+                </button>
+                <button
+                  onClick={() => handleDownloadExcel(report.id)}
+                  className="flex-1 min-w-[140px] px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors flex items-center justify-center gap-2 text-sm"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Excel
                 </button>
               </div>
             </div>

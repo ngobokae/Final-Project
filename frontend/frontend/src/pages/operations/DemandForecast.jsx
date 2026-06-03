@@ -24,9 +24,8 @@ import { useConfirmDialog } from '../../contexts/ConfirmDialogContext';
 
 export default function DemandForecast() {
   const { confirm } = useConfirmDialog();
-  const [timeHorizon, setTimeHorizon] = useState('1y');
+  const [timeHorizon, setTimeHorizon] = useState('30d');
   const [selectedModel, setSelectedModel] = useState('ensemble');
-  const [confidenceThreshold, setConfidenceThreshold] = useState('80');
   const [selectedProduct, setSelectedProduct] = useState('all');
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState([]);
@@ -120,26 +119,6 @@ export default function DemandForecast() {
       setForecasts([]);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDeleteAllForecasts = async () => {
-    const ok = await confirm('Delete ALL saved predictions for all products? This cannot be undone.', {
-      title: 'Delete All Predictions',
-      confirmText: 'Delete All',
-      variant: 'danger',
-    });
-    if (!ok) {
-      return;
-    }
-    try {
-      await apiDelete('/api/forecast?scope=all');
-      setForecasts([]);
-      window.dispatchEvent(new CustomEvent('app:forecasts-updated'));
-      window.dispatchEvent(new CustomEvent('app:operations-data-updated'));
-    } catch (error) {
-      console.error('Failed to delete all forecasts:', error);
-      alert('Failed to delete all predictions. Please try again.');
     }
   };
 
@@ -433,16 +412,6 @@ export default function DemandForecast() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Min. Confidence (%)</Label>
-              <Input
-                type="number"
-                value={confidenceThreshold}
-                onChange={(e) => setConfidenceThreshold(e.target.value)}
-                min="0"
-                max="100"
-              />
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -558,16 +527,10 @@ export default function DemandForecast() {
                   running Predict 2 (Sales) to see new data.
                 </CardDescription>
               </div>
-              {forecasts.length > 0 && (
-                <Button variant="outline" size="sm" onClick={handleDeleteAllForecasts}>
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete all
-                </Button>
-              )}
             </CardHeader>
             <CardContent>
               {forecasts.length > 0 ? (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto max-h-[30rem] overflow-y-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-gray-50 dark:bg-neutral-800/50 dark:border-neutral-600">
@@ -605,7 +568,6 @@ export default function DemandForecast() {
                       ))}
                     </tbody>
                   </table>
-                  <p className="text-xs text-gray-500 mt-2">Showing {forecasts.length} forecast row(s). Change &quot;Time horizon&quot; to see more or less.</p>
                 </div>
               ) : (
                 <div className="text-center py-10 text-gray-500">
@@ -622,25 +584,30 @@ export default function DemandForecast() {
               <CardDescription>Summary of demand predictions by product</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {forecasts.length > 0 ? forecasts.slice(0, 20).map((forecast, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-800 dark:border-neutral-600 transition-colors">
-                    <div>
-                      <h4 className="font-medium">{forecast.product_name || 'Product'}</h4>
-                      <p className="text-sm text-gray-500">
-                        Forecast: {forecast.forecasted_demand} units • Confidence: {Math.round((forecast.confidence_level || 0.95) * 100)}%
-                      </p>
+              {forecasts.length > 0 ? (
+                <div className="max-h-[34rem] overflow-y-auto space-y-4 pr-2">
+                  {forecasts.slice(0, 20).map((forecast, index) => (
+                    <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-800 dark:border-neutral-600 transition-colors">
+                      <div>
+                        <h4 className="font-medium">{forecast.product_name || 'Product'}</h4>
+                        <p className="text-sm text-gray-500">
+                          Forecast: {forecast.forecasted_demand} units • Confidence: {Math.round((forecast.confidence_level || 0.95) * 100)}%
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={forecast.trend_indicator === 'increasing' ? 'default' : 'secondary'}>
+                          {forecast.trend_indicator === 'increasing' ? '↗ Increasing' : forecast.trend_indicator === 'decreasing' ? '↘ Decreasing' : '→ Stable'}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={forecast.trend_indicator === 'increasing' ? 'default' : 'secondary'}>
-                        {forecast.trend_indicator === 'increasing' ? '↗ Increasing' : forecast.trend_indicator === 'decreasing' ? '↘ Decreasing' : '→ Stable'}
-                      </Badge>
-                    </div>
-                  </div>
-                )) : (
-                  <p className="text-center text-gray-500 py-4">No forecasts. Run Predict 2 (Sales) or generate below, then Refresh.</p>
-                )}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-gray-500 py-4">No forecasts. Run Predict 2 (Sales) or generate below, then Refresh.</p>
+              )}
+              {forecasts.length > 20 && (
+                <p className="mt-3 text-xs text-gray-500">Showing first 20 items. Scroll to review the summary and adjust the time horizon for more.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

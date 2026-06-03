@@ -27,7 +27,7 @@ export default function SalesData() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRegion, setFilterRegion] = useState('all');
   const [filterProduct, setFilterProduct] = useState('all');
-  const [dateRange, setDateRange] = useState('1y');
+  const [dateRange, setDateRange] = useState('30d');
   const [products, setProducts] = useState([]);
   const [stats, setStats] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -324,27 +324,6 @@ export default function SalesData() {
     setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleDeleteAllSalesData = async () => {
-    const ok = await confirm('Delete ALL sales data and related records (forecasts, recommendations, production plans)? This cannot be undone.', {
-      title: 'Delete All Sales Data',
-      confirmText: 'Delete All',
-      variant: 'danger',
-    });
-    if (!ok) {
-      return;
-    }
-    try {
-      await apiDelete('/api/sales?scope=all');
-      setUploadedFiles([]);
-      await fetchSalesData(null, false);
-      window.dispatchEvent(new CustomEvent('app:forecasts-updated'));
-      window.dispatchEvent(new CustomEvent('app:operations-data-updated'));
-    } catch (err) {
-      console.error('Delete all sales failed', err);
-      alert(err?.message || 'Failed to delete sales data.');
-    }
-  };
-
   const handleClearUploadHistory = () => {
     confirm('Clear the list of uploaded documents? This does NOT delete sales data from the database.', {
       title: 'Clear Upload History',
@@ -586,10 +565,6 @@ export default function SalesData() {
           <Button variant="outline" size="sm" onClick={() => fetchSalesData()} disabled={loading}>
             <RefreshCcw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleDeleteAllSalesData} className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30" disabled={loading}>
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete all sales data
           </Button>
         </div>
       </div>

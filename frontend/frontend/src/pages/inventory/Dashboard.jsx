@@ -145,6 +145,8 @@ export default function InventoryDashboard() {
   const backendValue = inventoryDashboard?.stockValue ?? null;
   const backendTurnover = inventoryDashboard?.turnoverRate ?? null;
   const backendForecastAccuracy = inventoryDashboard?.forecastAccuracy ?? null;
+  const backendForecastErrorStats = inventoryDashboard?.forecastErrorStats;
+  const abcSummary = inventoryDashboard?.abcSummary;
   const metrics = {
     totalItems: inventoryDashboard?.totalProducts ?? inventory.length,
     totalValue: backendValue != null ? backendValue : inventory.reduce((sum, item) => sum + ((item.available_stock ?? item.current_stock ?? 0) * (item.unit_cost || 0)), 0),
@@ -153,6 +155,12 @@ export default function InventoryDashboard() {
     overstockItems: inventoryDashboard?.overstockCount ?? inventory.filter(item => item.status === 'overstock').length,
     turnoverRate: backendTurnover != null ? backendTurnover : 0,
     accuracy: backendForecastAccuracy != null ? backendForecastAccuracy : 0,
+    forecastMAE: backendForecastErrorStats?.mae ?? 0,
+    forecastRMSE: backendForecastErrorStats?.rmse ?? 0,
+    forecastMAPE: backendForecastErrorStats?.mape ?? 0,
+    aCategoryCount: abcSummary?.a_count ?? 0,
+    bCategoryCount: abcSummary?.b_count ?? 0,
+    cCategoryCount: abcSummary?.c_count ?? 0,
     productsWithForecast: inventoryDashboard?.productsWithForecast ?? 0,
     totalForecastedDemand: inventoryDashboard?.totalForecastedDemand ?? 0
   };
@@ -176,6 +184,8 @@ export default function InventoryDashboard() {
     { label: 'Inventory Value', value: formatCurrency(metrics.totalValue), icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
     { label: 'Revenue at Risk', value: formatCurrency(revenueLoss), icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', sub: 'Potential stockout loss' },
     { label: 'Turnover Rate', value: `${metrics.turnoverRate}x`, icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
+    { label: 'Forecast MAE', value: `${metrics.forecastMAE}`, icon: TrendingDown, color: 'text-sky-600', bg: 'bg-sky-50', sub: 'Average error' },
+    { label: 'ABC Category A', value: `${metrics.aCategoryCount} SKUs`, icon: BarChart3, color: 'text-indigo-600', bg: 'bg-indigo-50', sub: 'Top 70% value' }
   ];
   const stockHealth = [
     { category: 'Optimal', count: inventory.filter(item => item.status === 'normal').length, percentage: inventory.length > 0 ? (inventory.filter(item => item.status === 'normal').length / inventory.length) * 100 : 0, change: 0, color: '#10b981' },
@@ -276,7 +286,7 @@ export default function InventoryDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Items</CardTitle>
@@ -334,7 +344,39 @@ export default function InventoryDashboard() {
             <p className="text-[10px] text-red-600/70 mt-1 font-bold uppercase">Potential Stockout Loss</p>
           </CardContent>
         </Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Forecast MAE</CardTitle>
+            <div className="p-2 rounded-lg bg-sky-50">
+              <TrendingDown className="h-4 w-4 text-sky-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics.forecastMAE}</div>
+            <p className="text-xs text-muted-foreground mt-1">Mean absolute forecast error</p>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">ABC Class A</CardTitle>
+            <div className="p-2 rounded-lg bg-indigo-50">
+              <BarChart3 className="h-4 w-4 text-indigo-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics.aCategoryCount}</div>
+            <p className="text-xs text-muted-foreground mt-1">Top 70% inventory value SKUs</p>
+          </CardContent>
+        </Card>
       </div>
+
+      {inventoryDashboard?.forecastRecommendation && (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 shadow-sm">
+          <span className="font-semibold">Forecast Insight:</span> {inventoryDashboard.forecastRecommendation}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-1 shadow-md border-neutral-200 overflow-hidden relative">

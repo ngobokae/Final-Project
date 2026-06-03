@@ -14,12 +14,12 @@ import { formatCurrency } from '../../utils/currency';
 
 export default function OperationsDashboard() {
   const [metrics, setMetrics] = useState({
-    salesThisMonth: 0,
-    salesGrowth: 0,
-    forecastAccuracy: 0,
-    pendingOrders: 0,
-    lowStockAlerts: 0,
-    productionBacklog: 0
+    salesThisMonth: null,
+    salesGrowth: null,
+    forecastAccuracy: null,
+    pendingOrders: null,
+    lowStockAlerts: null,
+    productionBacklog: null
   });
   const [recentForecasts, setRecentForecasts] = useState([]);
   const [alertsList, setAlertsList] = useState([]);
@@ -87,22 +87,21 @@ export default function OperationsDashboard() {
       const pendingOrders =
         procurement?.pending ??
         dashStats.pending_orders ??
-        0;
+        null;
 
       const lowStockCount = Array.isArray(alerts.alerts)
         ? alerts.alerts.length
-        : dashStats.critical_alerts || 0;
+        : dashStats.critical_alerts ?? null;
 
       const productionBacklog =
-        (production.in_progress || 0) +
-        (production.delayed || 0) ||
-        dashStats.production_backlog ||
-        0;
+        typeof production.in_progress === 'number' || typeof production.delayed === 'number'
+          ? (production.in_progress || 0) + (production.delayed || 0)
+          : dashStats.production_backlog ?? null;
 
       setMetrics({
         salesThisMonth: monthlyRevenue,
-        salesGrowth: growthPct,
-        forecastAccuracy: accuracy > 0 ? accuracy : 0,
+        salesGrowth: typeof growthPct === 'number' ? growthPct : null,
+        forecastAccuracy: accuracy > 0 ? accuracy : null,
         pendingOrders,
         lowStockAlerts: lowStockCount,
         productionBacklog
@@ -166,7 +165,17 @@ export default function OperationsDashboard() {
 
   // Calculate dynamic resilience index
   const resilienceIndex = useMemo(() => {
-    const rawResilience = 99.5 - (metrics.pendingOrders * 1.5 + metrics.lowStockAlerts * 4.5 + metrics.productionBacklog * 2.0);
+    if (
+      metrics.pendingOrders === null &&
+      metrics.lowStockAlerts === null &&
+      metrics.productionBacklog === null
+    ) {
+      return null;
+    }
+    const pending = Number(metrics.pendingOrders || 0);
+    const lowStock = Number(metrics.lowStockAlerts || 0);
+    const backlog = Number(metrics.productionBacklog || 0);
+    const rawResilience = 99.5 - (pending * 1.5 + lowStock * 4.5 + backlog * 2.0);
     return Math.max(35, Math.min(99, Math.round(rawResilience)));
   }, [metrics]);
 
@@ -229,9 +238,13 @@ export default function OperationsDashboard() {
             <DollarSign className="h-4 w-4 text-gray-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{formatCurrency(metrics.salesThisMonth)}</div>
-            <p className="text-xs text-green-600 font-semibold mt-1">
-              +{metrics.salesGrowth}% from last month
+            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            {metrics.salesThisMonth !== null ? formatCurrency(metrics.salesThisMonth) : 'No sales data'}
+          </div>
+            <p className="text-xs text-gray-500 mt-1">
+              {metrics.salesGrowth !== null
+                ? `+${metrics.salesGrowth}% from last month`
+                : 'No trend data available'}
             </p>
           </CardContent>
         </Card>
@@ -242,9 +255,15 @@ export default function OperationsDashboard() {
             <TrendingUp className="h-4 w-4 text-gray-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{metrics.forecastAccuracy}%</div>
-            <p className="text-xs text-blue-600 font-semibold mt-1">
-              Above target (90%)
+            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            {metrics.forecastAccuracy !== null ? `${metrics.forecastAccuracy}%` : 'N/A'}
+          </div>
+            <p className="text-xs text-gray-500 mt-1">
+              {metrics.forecastAccuracy !== null
+                ? metrics.forecastAccuracy >= 90
+                  ? 'Forecast performance is on target'
+                  : 'Review forecast model and data quality'
+                : 'Forecast data not available'}
             </p>
           </CardContent>
         </Card>
@@ -255,18 +274,26 @@ export default function OperationsDashboard() {
             <Package className="h-4 w-4 text-gray-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{metrics.pendingOrders}</div>
-            <p className="text-xs text-amber-600 font-semibold mt-1">
-              Requires attention
+            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            {metrics.pendingOrders !== null ? metrics.pendingOrders : 'N/A'}
+          </div>
+            <p className="text-xs text-gray-500 mt-1">
+              {metrics.pendingOrders !== null
+                ? metrics.pendingOrders > 0
+                  ? 'Requires attention'
+                  : 'No pending orders'
+                : 'Order status unavailable'}
             </p>
           </CardContent>
         </Card>
 
         <Card className={`border-0 shadow-lg text-white bg-gradient-to-br transition-all duration-500 hover:-translate-y-1 hover:shadow-xl ${
-          resilienceIndex >= 85 
-            ? 'from-emerald-500 to-emerald-600' 
-            : resilienceIndex >= 65 
-            ? 'from-amber-500 to-amber-600' 
+          resilienceIndex === null
+            ? 'from-slate-500 to-slate-600'
+            : resilienceIndex >= 85
+            ? 'from-emerald-500 to-emerald-600'
+            : resilienceIndex >= 65
+            ? 'from-amber-500 to-amber-600'
             : 'from-rose-500 to-rose-600'
         }`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -274,22 +301,28 @@ export default function OperationsDashboard() {
             <ShieldCheck className="h-5 w-5 text-white" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-black">{resilienceIndex}%</div>
-            <div className="flex items-center gap-2 mt-2">
-               <div className="h-1 flex-1 bg-white/20 rounded-full overflow-hidden">
-                  <div className="h-full bg-white transition-all duration-500" style={{ width: `${resilienceIndex}%` }}></div>
-               </div>
-               <span className="text-[10px] font-bold uppercase tracking-wider">
-                 {resilienceIndex >= 85 ? 'Optimized' : resilienceIndex >= 65 ? 'Constrained' : 'Vulnerable'}
-               </span>
-            </div>
-            <p className="text-[10px] text-white/95 mt-3 italic leading-tight">
-               {resilienceIndex >= 85 
-                 ? 'Excellent coverage. Low stock alerts and production delays are fully controlled.'
-                 : resilienceIndex >= 65
-                 ? 'Constrained. Active shortages or pending material supply items requiring oversight.'
-                 : 'Critical vulnerability. Multiple low stock alerts or severe production backlogs.'}
-            </p>
+            <div className="text-3xl font-black">{resilienceIndex !== null ? `${resilienceIndex}%` : 'N/A'}</div>
+            {resilienceIndex !== null ? (
+              <>
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="h-1 flex-1 bg-white/20 rounded-full overflow-hidden">
+                    <div className="h-full bg-white transition-all duration-500" style={{ width: `${resilienceIndex}%` }}></div>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider">
+                    {resilienceIndex >= 85 ? 'Optimized' : resilienceIndex >= 65 ? 'Constrained' : 'Vulnerable'}
+                  </span>
+                </div>
+                <p className="text-[10px] text-white/95 mt-3 italic leading-tight">
+                  {resilienceIndex >= 85
+                    ? 'Excellent coverage. Low stock alerts and production delays are under control.'
+                    : resilienceIndex >= 65
+                    ? 'Constrained. Work on supply chain priorities and production capacity.'
+                    : 'High risk. Resolve stock alerts and backlog issues first.'}
+                </p>
+              </>
+            ) : (
+              <p className="text-[10px] text-white/95 mt-3 italic leading-tight">Insufficient data to calculate resilience index.</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -425,92 +458,6 @@ export default function OperationsDashboard() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="hover:shadow-xl transition-all duration-300 dark:bg-neutral-900 border border-gray-100 dark:border-neutral-800">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Factory className="w-5 h-5 text-purple-500" />
-              Production Recommendations
-            </CardTitle>
-            <CardDescription>AI-suggested production quantities from demand forecasts</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {recentForecasts.length > 0 ? (
-              <>
-                {recentForecasts.slice(0, 5).map((item, index) => (
-                  <div key={index} className="flex items-center justify-between border-b dark:border-neutral-800 pb-3 last:border-b-0 last:pb-0">
-                    <span className="font-medium text-gray-800 dark:text-gray-250">{item.product} Production</span>
-                    <div className="text-right">
-                      <div className="font-bold text-gray-900 dark:text-gray-100">{item.forecast?.toLocaleString?.() ?? item.forecast} units</div>
-                      <div className="text-xs text-gray-500">
-                        {item.trend === 'increasing' ? '↗ Increase Recommended' : item.trend === 'decreasing' ? '↘ Decrease Recommended' : '→ Stable Volume'}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <Button className="w-full mt-4 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-lg shadow-purple-500/20 font-semibold" asChild>
-                  <Link to="/operations/production-plan">Update Production Plan</Link>
-                </Button>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-gray-500 py-2">Run Predict 2 (Sales) to generate demand forecasts; production suggestions will appear here.</p>
-                <Button className="w-full mt-4 text-white bg-blue-600 hover:bg-blue-700 shadow shadow-blue-500/10 font-semibold" asChild>
-                  <Link to="/operations/sales-data">Go to Sales Data</Link>
-                </Button>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-xl transition-all duration-300 dark:bg-neutral-900 border border-gray-100 dark:border-neutral-800">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-500" />
-              Procurement Alerts
-            </CardTitle>
-            <CardDescription>Items requiring immediate ordering</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {alertsList.length > 0 ? (
-              <>
-                {alertsList.map((alert, index) => {
-                  const severity = alert.severity || 'medium';
-                  const color =
-                    severity === 'critical'
-                      ? 'text-rose-500'
-                      : severity === 'high'
-                      ? 'text-yellow-500'
-                      : 'text-amber-500';
-                  return (
-                    <div key={alert.id ?? index} className="flex items-start gap-3 border-b dark:border-neutral-800 pb-3 last:border-b-0 last:pb-0">
-                      <AlertTriangle className={`h-5 w-5 mt-0.5 shrink-0 ${color}`} />
-                      <div className="flex-1">
-                        <p className="font-semibold text-gray-800 dark:text-gray-200">
-                          {alert.product_name || 'Unknown product'}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {alert.message ||
-                            `Stock: ${alert.available_stock ?? alert.current_stock ?? 0} units • Reorder: ${
-                              alert.reorder_point ?? 'n/a'
-                            } units`}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </>
-            ) : (
-              <p className="text-center text-gray-500 py-6 text-sm">
-                No critical procurement alerts. Run forecasts and inventory checks to see risk items here.
-              </p>
-            )}
-            <Button variant="outline" className="w-full mt-4 border-gray-300 dark:border-neutral-700 text-gray-700 dark:text-gray-300 font-semibold" asChild>
-              <Link to="/operations/procurement-plan">View Procurement Plan</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }

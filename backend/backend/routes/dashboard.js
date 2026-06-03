@@ -54,6 +54,117 @@ const calculateInventoryTurnover = async (days = 30) => {
   }
 };
 
+const calculateForecastErrorMetrics = async (days = 30) => {
+  try {
+    const rows = await query(`
+      SELECT f.id, p.name as product_name, p.sku, f.forecast_date,
+        f.forecasted_demand,
+        COALESCE(SUM(s.quantity), 0) as actual
+      FROM forecast_results f
+      JOIN products p ON f.product_id = p.id
+      LEFT JOIN sales s ON f.product_id = s.product_id AND DATE(s.sale_date) = f.forecast_date
+      WHERE f.forecast_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+        AND f.forecast_date <= CURDATE()
+      GROUP BY f.id
+      ORDER BY ABS(f.forecasted_demand - COALESCE(SUM(s.quantity), 0)) DESC
+      LIMIT 200
+    `, [days]);
+
+    let totalAbsolute = 0;
+    let totalSquared = 0;
+    let totalPct = 0;
+    let mapeCount = 0;
+    const details = rows.map((row) => {
+      const forecast = Number(row.forecasted_demand || 0);
+      const actual = Number(row.actual || 0);
+      const error = forecast - actual;
+      const absoluteError = Math.abs(error);
+      if (actual > 0) {
+        totalPct += Math.abs(error / actual);
+        mapeCount += 1;
+      }
+      totalAbsolute += absoluteError;
+      totalSquared += absoluteError * absoluteError;
+      return {
+        ...row,
+        forecasted_demand: forecast,
+        actual,
+        error_direction: forecast >= actual ? 'over' : 'under',
+        absolute_error: Math.round(absoluteError * 100) / 100,
+        percent_error: actual > 0 ? Math.round((Math.abs(error / actual) * 100) * 100) / 100 : null
+      };
+    });
+
+    const count = details.length;
+    const mae = count > 0 ? totalAbsolute / count : 0;
+    const rmse = count > 0 ? Math.sqrt(totalSquared / count) : 0;
+    const mape = mapeCount > 0 ? (totalPct / mapeCount) * 100 : 0;
+
+    return {
+      mae: Math.round(mae * 100) / 100,
+      rmse: Math.round(rmse * 100) / 100,
+      mape: Math.round(mape * 100) / 100,
+      count,
+      topErrors: details.slice(0, 10)
+    };
+  } catch (error) {
+    console.error('Forecast error metrics calculation failed:', error);
+    return {
+      mae: 0,
+      rmse: 0,
+      mape: 0,
+      count: 0,
+      topErrors: []
+    };
+  }
+};
+
+const calculateInventoryABCAnalysis = async () => {
+  try {
+    const rows = await query(`
+      SELECT p.id as product_id, p.name as product_name, p.sku, p.category,
+        i.current_stock, i.available_stock, p.unit_cost,
+        (i.current_stock * p.unit_cost) as stock_value
+      FROM inventory i
+      JOIN products p ON i.product_id = p.id
+      WHERE p.is_active = TRUE
+      ORDER BY stock_value DESC
+    `);
+
+    const totalValue = rows.reduce((sum, item) => sum + Number(item.stock_value || 0), 0);
+    let cumulativeValue = 0;
+    const details = rows.map((item) => {
+      const stockValue = Number(item.stock_value || 0);
+      cumulativeValue += stockValue;
+      const cumulativeShare = totalValue > 0 ? cumulativeValue / totalValue : 0;
+      const abcCategory = cumulativeShare <= 0.7 ? 'A' : cumulativeShare <= 0.9 ? 'B' : 'C';
+      return {
+        ...item,
+        stock_value: Math.round(stockValue * 100) / 100,
+        value_share: totalValue ? Math.round((stockValue / totalValue) * 10000) / 100 : 0,
+        cumulative_share: totalValue ? Math.round(cumulativeShare * 10000) / 100 : 0,
+        abc_category: abcCategory
+      };
+    });
+
+    const summary = {
+      total_items: rows.length,
+      total_value: Math.round(totalValue * 100) / 100,
+      a_count: details.filter((i) => i.abc_category === 'A').length,
+      b_count: details.filter((i) => i.abc_category === 'B').length,
+      c_count: details.filter((i) => i.abc_category === 'C').length,
+      a_value: Math.round(details.filter((i) => i.abc_category === 'A').reduce((sum, i) => sum + i.stock_value, 0) * 100) / 100,
+      b_value: Math.round(details.filter((i) => i.abc_category === 'B').reduce((sum, i) => sum + i.stock_value, 0) * 100) / 100,
+      c_value: Math.round(details.filter((i) => i.abc_category === 'C').reduce((sum, i) => sum + i.stock_value, 0) * 100) / 100
+    };
+
+    return { summary, details: details.slice(0, 30) };
+  } catch (error) {
+    console.error('Inventory ABC analysis failed:', error);
+    return { summary: { total_items: 0, total_value: 0, a_count: 0, b_count: 0, c_count: 0, a_value: 0, b_value: 0, c_value: 0 }, details: [] };
+  }
+};
+
 export const handleGetDashboardStats = async (req, res) => {
   try {
     await generateAlertsFromInventory();
@@ -259,6 +370,12 @@ export const handleGetInventoryDashboard = async (req, res) => {
       FROM inventory i JOIN products p ON i.product_id = p.id
       WHERE p.is_active = TRUE AND i.available_stock >= (p.reorder_point * 2) ORDER BY i.available_stock DESC LIMIT 15
     `);
+    const forecastErrorStats = await calculateForecastErrorMetrics(30);
+    const abcAnalysis = await calculateInventoryABCAnalysis();
+    const forecastRecommendation = forecastErrorStats.mape > 20
+      ? 'Forecast error is elevated; review seasonality and SKU-level model tuning for high variance items.'
+      : 'Forecast performance is within expected tolerance.';
+
     sendJSON(res, 200, {
       totalProducts: productCount.count,
       stockValue: Number(stockValue?.value) || 0,
@@ -266,6 +383,10 @@ export const handleGetInventoryDashboard = async (req, res) => {
       overstockCount: overstock.count,
       turnoverRate: Math.round(turnoverRate * 10) / 10,
       forecastAccuracy: Math.round(forecastAccuracy * 10) / 10,
+      forecastErrorStats,
+      forecastRecommendation,
+      abcSummary: abcAnalysis.summary,
+      abcTopProducts: abcAnalysis.details,
       productsWithForecast: forecastSummary?.products_with_forecast ?? 0,
       totalForecastedDemand: Number(forecastSummary?.total_forecasted_demand) || 0,
       chartData: inventoryChart,

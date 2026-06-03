@@ -28,8 +28,13 @@ export const handleGetAuditLogs = async (req, res) => {
       params.push(userId);
     }
     if (action) {
-      sql += ' AND a.action = ?';
-      params.push(action);
+      if (action.toLowerCase() === 'uploads') {
+        sql += ' AND a.action LIKE ?';
+        params.push('%UPLOAD%');
+      } else {
+        sql += ' AND a.action = ?';
+        params.push(action);
+      }
     }
 
     sql += ` ORDER BY a.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
@@ -44,8 +49,13 @@ export const handleGetAuditLogs = async (req, res) => {
       countParams.push(userId);
     }
     if (action) {
-      countSql += ' AND action = ?';
-      countParams.push(action);
+      if (action.toLowerCase() === 'uploads') {
+        countSql += ' AND action LIKE ?';
+        countParams.push('%UPLOAD%');
+      } else {
+        countSql += ' AND action = ?';
+        countParams.push(action);
+      }
     }
     const [countResult] = await query(countSql, countParams);
     const total = countResult.total;

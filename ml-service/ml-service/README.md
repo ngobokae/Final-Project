@@ -114,7 +114,10 @@ python manage.py runserver
 
 ## ML Algorithms
 
-- Linear regression for trend detection
+- ARIMA for autoregressive integrated moving average forecasting
+- Prophet-style seasonal and trend decomposition
+- Random Forest regression using lag features
+- LSTM neural network for sequence-based demand prediction
 - Moving averages for baseline forecasting
 - Seasonality analysis
 - Economic Order Quantity (EOQ)

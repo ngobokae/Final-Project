@@ -57,6 +57,17 @@ import CommandPalette from './components/CommandPalette';
 function AppContent() {
   const { user, isLoading } = useAuth();
 
+  const roleRouteMap = {
+    admin: '/admin',
+    operations: '/operations',
+    operations_manager: '/operations',
+    inventory: '/inventory',
+    inventory_manager: '/inventory',
+    executive: '/executive'
+  };
+
+  const getHomePath = (role) => roleRouteMap[role] || `/${role}`;
+
   useEffect(() => {
     const applyTitle = () => {
       try {
@@ -86,7 +97,7 @@ function AppContent() {
     <>
       <CommandPalette />
       <Routes>
-        <Route path="/" element={user ? <Navigate to={`/${user.role}`} replace /> : <Landing />} />
+        <Route path="/" element={user ? <Navigate to={getHomePath(user.role)} replace /> : <Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/forget-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
@@ -110,7 +121,7 @@ function AppContent() {
 
         {/* Operations Routes */}
         <Route path="/operations/*" element={
-          <ProtectedRoute allowedRoles={['operations']}>
+          <ProtectedRoute allowedRoles={['operations', 'operations_manager']}>
             <OperationsLayout />
           </ProtectedRoute>
         }>
@@ -127,7 +138,7 @@ function AppContent() {
 
         {/* Inventory Routes */}
         <Route path="/inventory/*" element={
-          <ProtectedRoute allowedRoles={['inventory']}>
+          <ProtectedRoute allowedRoles={['inventory', 'inventory_manager']}>
             <InventoryLayout />
           </ProtectedRoute>
         }>

@@ -788,7 +788,7 @@ export default function ProcurementPlan() {
                               Digital PO
                             </Button>
                             
-                            {String(order.status || '').toLowerCase() === 'pending' && user?.role === 'executive' && (
+                            {String(order.status || '').toLowerCase() === 'pending' && (user?.role === 'executive' || user?.role === 'operations_manager') && (
                                 <Button
                                   variant="outline"
                                   size="sm"

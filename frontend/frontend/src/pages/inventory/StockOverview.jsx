@@ -281,6 +281,39 @@ export default function StockOverview() {
     return acc;
   }, {});
 
+  const abcInventory = (() => {
+    const sorted = [...inventory]
+      .map((item) => {
+        const stock = item.available_stock ?? item.current_stock ?? 0;
+        const stockValue = stock * (item.unit_cost || 0);
+        return { ...item, stock_value: stockValue };
+      })
+      .sort((a, b) => b.stock_value - a.stock_value);
+
+    const totalValue = sorted.reduce((sum, item) => sum + item.stock_value, 0);
+    let cumulative = 0;
+    const details = sorted.map((item) => {
+      cumulative += item.stock_value;
+      const share = totalValue ? cumulative / totalValue : 0;
+      const abc_category = share <= 0.7 ? 'A' : share <= 0.9 ? 'B' : 'C';
+      return {
+        ...item,
+        abc_category,
+        value_share: totalValue ? (item.stock_value / totalValue) * 100 : 0
+      };
+    });
+
+    return {
+      summary: {
+        a_count: details.filter((item) => item.abc_category === 'A').length,
+        b_count: details.filter((item) => item.abc_category === 'B').length,
+        c_count: details.filter((item) => item.abc_category === 'C').length,
+        total_value: totalValue
+      },
+      details: details.slice(0, 20)
+    };
+  })();
+
   // Get real stock movement from audit logs
   const [movementData, setMovementData] = useState([
     { month: 'Jan', in: 0, out: 0 },
@@ -438,6 +471,56 @@ export default function StockOverview() {
             <p className="text-xs text-gray-500 mt-1">{inventory.length > 0 ? Math.round((metrics.optimal / inventory.length) * 100) : 0}% of inventory</p>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">ABC Inventory Classification</h2>
+            <p className="text-sm text-gray-500">Rank SKUs by inventory value and highlight the top A-class items.</p>
+          </div>
+          <div className="grid grid-cols-3 gap-3 w-full md:w-auto">
+            <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50">
+              <div className="text-xs text-slate-500 uppercase font-semibold">Class A</div>
+              <div className="text-2xl font-bold text-slate-900">{abcInventory.summary.a_count}</div>
+              <div className="text-xs text-slate-500">Top 70% value</div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50">
+              <div className="text-xs text-slate-500 uppercase font-semibold">Class B</div>
+              <div className="text-2xl font-bold text-slate-900">{abcInventory.summary.b_count}</div>
+              <div className="text-xs text-slate-500">Next 20% value</div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50">
+              <div className="text-xs text-slate-500 uppercase font-semibold">Class C</div>
+              <div className="text-2xl font-bold text-slate-900">{abcInventory.summary.c_count}</div>
+              <div className="text-xs text-slate-500">Bottom 10% value</div>
+            </div>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm text-gray-600">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3">SKU</th>
+                <th className="px-4 py-3">Product</th>
+                <th className="px-4 py-3">ABC Class</th>
+                <th className="px-4 py-3">Stock Value</th>
+                <th className="px-4 py-3">Value Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              {abcInventory.details.slice(0, 8).map((item) => (
+                <tr key={item.product_id || item.sku} className="border-b border-gray-100">
+                  <td className="px-4 py-3 font-medium text-gray-900">{item.sku}</td>
+                  <td className="px-4 py-3">{item.product_name || item.name}</td>
+                  <td className="px-4 py-3">{item.abc_category}</td>
+                  <td className="px-4 py-3">{formatCurrency(item.stock_value)}</td>
+                  <td className="px-4 py-3">{item.value_share.toFixed(1)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Tabs */}

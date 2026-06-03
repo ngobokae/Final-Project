@@ -1,7 +1,9 @@
-// Shared definition of available AI models,
-// used by admin AI Models page and operations prediction flows.
+import dotenv from 'dotenv';
+import { query } from './config/database.js';
 
-export const DEMAND_MODELS = [
+dotenv.config();
+
+const FIVE_MODELS = JSON.stringify([
   {
     id: 'ensemble',
     name: 'Ensemble (Best)',
@@ -42,5 +44,32 @@ export const DEMAND_MODELS = [
     accuracy: 94.5,
     active: true,
   },
-];
+]);
 
+async function fixModels() {
+  try {
+    console.log('Updating demand_models in system_settings...');
+    await query(
+      `INSERT INTO system_settings (setting_key, setting_value, setting_type, category, description)
+       VALUES (?, ?, 'json', 'ml', 'Demand forecast models')
+       ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+      ['demand_models', FIVE_MODELS]
+    );
+    console.log('✓ Updated to 5 models');
+    
+    // Verify
+    const result = await query(
+      'SELECT setting_value FROM system_settings WHERE setting_key = ?',
+      ['demand_models']
+    );
+    const stored = JSON.parse(result[0].setting_value);
+    console.log(`✓ Verified: ${stored.length} models now stored in database`);
+    
+    process.exit(0);
+  } catch (error) {
+    console.error('Error:', error.message);
+    process.exit(1);
+  }
+}
+
+fixModels();

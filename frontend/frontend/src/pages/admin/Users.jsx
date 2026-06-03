@@ -17,7 +17,7 @@ export default function UsersPage() {
   const [formData, setFormData] = useState({
     email: '',
     name: '',
-    role: 'operations',
+    role: 'operations_manager',
     password: ''
   });
 
@@ -29,7 +29,7 @@ export default function UsersPage() {
     if (location.state?.openCreate) {
       setShowModal(true);
       setEditingUser(null);
-      setFormData({ email: '', name: '', role: 'operations', password: '' });
+      setFormData({ email: '', name: '', role: 'operations_manager', password: '' });
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
@@ -83,7 +83,7 @@ export default function UsersPage() {
         fetchUsers();
         setShowModal(false);
         setEditingUser(null);
-        setFormData({ email: '', name: '', role: 'operations', password: '' });
+        setFormData({ email: '', name: '', role: 'operations_manager', password: '' });
       }
     } catch (error) {
       console.error('Failed to save user:', error);
@@ -130,10 +130,19 @@ export default function UsersPage() {
     const colors = {
       admin: 'bg-red-100 text-red-800 border-red-200',
       operations: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      operations_manager: 'bg-emerald-100 text-emerald-800 border-emerald-200',
       inventory: 'bg-purple-100 text-purple-800 border-purple-200',
       executive: 'bg-amber-100 text-amber-800 border-amber-200'
     };
     return colors[role] || 'bg-gray-100 text-gray-800';
+  };
+
+  const formatRole = (role) => {
+    if (!role) return '';
+    return role
+      .split('_')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
   };
 
   if (loading) {
@@ -156,7 +165,7 @@ export default function UsersPage() {
           <p className="text-gray-500 mt-1">Manage system users and their roles</p>
           {roleFilter !== 'all' && (
             <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-sm">
-              Role: {roleFilter}
+              Role: {formatRole(roleFilter)}
               <button type="button" onClick={clearRoleFilter} className="hover:opacity-70">
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -166,7 +175,7 @@ export default function UsersPage() {
         <button
           onClick={() => {
             setEditingUser(null);
-            setFormData({ email: '', name: '', role: 'operations', password: '' });
+            setFormData({ email: '', name: '', role: 'operations_manager', password: '' });
             setShowModal(true);
           }}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30"
@@ -222,7 +231,7 @@ export default function UsersPage() {
                 <td className="px-6 py-4">
                   <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${getRoleBadgeColor(user.role)}`}>
                     <Shield className="w-3 h-3" />
-                    {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                    {formatRole(user.role)}
                   </span>
                 </td>
                 <td className="px-6 py-4">
@@ -308,6 +317,7 @@ export default function UsersPage() {
                 >
                   <option value="admin">Admin</option>
                   <option value="operations">Operations</option>
+                  <option value="operations_manager">Operations Manager</option>
                   <option value="inventory">Inventory</option>
                   <option value="executive">Executive</option>
                 </select>

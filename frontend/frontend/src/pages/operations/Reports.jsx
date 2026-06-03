@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FileText, Download, Calendar, Filter, BarChart3, TrendingUp, Package, DollarSign, Loader2 } from 'lucide-react';
 import { apiGet } from '../../utils/api';
-import { downloadCsvReport } from '../../utils/reportExport';
+import { downloadCsvReport, downloadExcelReport } from '../../utils/reportExport';
 
 export default function OperationsReports() {
   const [selectedReport, setSelectedReport] = useState('sales');
@@ -80,6 +80,17 @@ export default function OperationsReports() {
     } catch (error) {
       console.error('Failed to download report:', error);
       alert('Failed to download report.');
+    }
+  };
+
+  const handleDownloadExcel = async (reportId) => {
+    try {
+      const result = await fetchReportById(reportId);
+      if (!result) return;
+      await downloadExcelReport(result.reportData, `${result.reportConfig.name} Report`, `${reportId}-report`);
+    } catch (error) {
+      console.error('Failed to download Excel report:', error);
+      alert('Failed to download Excel report.');
     }
   };
 
@@ -168,13 +179,20 @@ export default function OperationsReports() {
                   </div>
                 </div>
               </div>
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex gap-2 flex-wrap">
                 <button
                   onClick={() => handleDownloadCsv(report.id)}
-                  className="flex-1 px-3 py-2 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors flex items-center justify-center gap-2 text-sm"
+                  className="flex-1 min-w-[140px] px-3 py-2 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors flex items-center justify-center gap-2 text-sm"
                 >
                   <Download className="w-4 h-4" />
                   Download CSV
+                </button>
+                <button
+                  onClick={() => handleDownloadExcel(report.id)}
+                  className="flex-1 min-w-[140px] px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors flex items-center justify-center gap-2 text-sm"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Excel
                 </button>
               </div>
             </div>

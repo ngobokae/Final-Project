@@ -225,6 +225,138 @@ export const handleGenerateInventoryValuationReport = async (req, res) => {
   }
 };
 
+export const handleGenerateInventoryForecastErrorReport = async (req, res) => {
+  try {
+    const queryParams = req.query || {};
+    const days = queryParams.days ? parseInt(queryParams.days) : 30;
+
+    const rows = await query(`
+      SELECT f.id, p.name as product_name, p.sku, f.forecast_date, f.forecasted_demand,
+        COALESCE(SUM(s.quantity), 0) as actual
+      FROM forecast_results f
+      JOIN products p ON f.product_id = p.id
+      LEFT JOIN sales s ON f.product_id = s.product_id AND DATE(s.sale_date) = f.forecast_date
+      WHERE f.forecast_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+        AND f.forecast_date <= CURDATE()
+      GROUP BY f.id
+      ORDER BY ABS(f.forecasted_demand - COALESCE(SUM(s.quantity), 0)) DESC
+      LIMIT 500
+    `, [days]);
+
+    let totalAbsolute = 0;
+    let totalSquared = 0;
+    let totalPct = 0;
+    let mapeCount = 0;
+    const details = rows.map((row) => {
+      const forecast = Number(row.forecasted_demand || 0);
+      const actual = Number(row.actual || 0);
+      const error = forecast - actual;
+      const absoluteError = Math.abs(error);
+      if (actual > 0) {
+        totalPct += Math.abs(error / actual);
+        mapeCount += 1;
+      }
+      totalAbsolute += absoluteError;
+      totalSquared += absoluteError * absoluteError;
+      return {
+        product_name: row.product_name,
+        sku: row.sku,
+        forecast_date: row.forecast_date,
+        forecasted_demand: forecast,
+        actual,
+        absolute_error: Math.round(absoluteError * 100) / 100,
+        error_direction: forecast >= actual ? 'over' : 'under',
+        percent_error: actual > 0 ? Math.round((Math.abs(error / actual) * 100) * 100) / 100 : null
+      };
+    });
+
+    const count = details.length;
+    const mae = count > 0 ? totalAbsolute / count : 0;
+    const rmse = count > 0 ? Math.sqrt(totalSquared / count) : 0;
+    const mape = mapeCount > 0 ? (totalPct / mapeCount) * 100 : 0;
+
+    const summary = {
+      records: count,
+      mae: Math.round(mae * 100) / 100,
+      rmse: Math.round(rmse * 100) / 100,
+      mape: Math.round(mape * 100) / 100,
+      mapped_records: mapeCount
+    };
+
+    sendJSON(res, 200, {
+      success: true,
+      report: {
+        type: 'inventory_forecast_error',
+        period: days,
+        summary,
+        details
+      }
+    });
+  } catch (error) {
+    console.error('Generate inventory forecast error report:', error);
+    sendError(res, 500, 'Failed to generate inventory forecast error report');
+  }
+};
+
+export const handleGenerateInventoryABCAnalysisReport = async (req, res) => {
+  try {
+    const rows = await query(`
+      SELECT p.id as product_id, p.name as product_name, p.sku, p.category,
+        i.current_stock, i.available_stock, p.unit_cost,
+        (i.current_stock * p.unit_cost) as stock_value
+      FROM inventory i
+      JOIN products p ON i.product_id = p.id
+      WHERE p.is_active = TRUE
+      ORDER BY stock_value DESC
+      LIMIT 500
+    `);
+
+    const totalValue = rows.reduce((sum, item) => sum + Number(item.stock_value || 0), 0);
+    let cumulativeValue = 0;
+    const details = rows.map((row) => {
+      const stockValue = Number(row.stock_value || 0);
+      cumulativeValue += stockValue;
+      const cumulativeShare = totalValue > 0 ? cumulativeValue / totalValue : 0;
+      const abcCategory = cumulativeShare <= 0.7 ? 'A' : cumulativeShare <= 0.9 ? 'B' : 'C';
+      return {
+        product_name: row.product_name,
+        sku: row.sku,
+        category: row.category || 'Uncategorized',
+        current_stock: row.current_stock,
+        available_stock: row.available_stock,
+        unit_cost: Number(row.unit_cost || 0),
+        stock_value: Math.round(stockValue * 100) / 100,
+        value_share: totalValue ? Math.round((stockValue / totalValue) * 10000) / 100 : 0,
+        cumulative_share: Math.round(cumulativeShare * 10000) / 100,
+        abc_category: abcCategory
+      };
+    });
+
+    const summary = {
+      total_items: rows.length,
+      total_inventory_value: Math.round(totalValue * 100) / 100,
+      a_count: details.filter((i) => i.abc_category === 'A').length,
+      b_count: details.filter((i) => i.abc_category === 'B').length,
+      c_count: details.filter((i) => i.abc_category === 'C').length,
+      a_value: Math.round(details.filter((i) => i.abc_category === 'A').reduce((sum, i) => sum + i.stock_value, 0) * 100) / 100,
+      b_value: Math.round(details.filter((i) => i.abc_category === 'B').reduce((sum, i) => sum + i.stock_value, 0) * 100) / 100,
+      c_value: Math.round(details.filter((i) => i.abc_category === 'C').reduce((sum, i) => sum + i.stock_value, 0) * 100) / 100
+    };
+
+    sendJSON(res, 200, {
+      success: true,
+      report: {
+        type: 'inventory_abc_analysis',
+        summary,
+        details
+      }
+    });
+  } catch (error) {
+    console.error('Generate inventory ABC analysis report:', error);
+    sendError(res, 500, 'Failed to generate inventory ABC analysis report');
+  }
+};
+
 // Executive Reports
 export const handleGenerateExecutiveSummary = async (req, res) => {
   try {

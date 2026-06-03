@@ -11,6 +11,7 @@ export default function KPIs() {
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('month');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const getDaysFromRange = (range) => {
     switch (range) {
@@ -178,8 +179,18 @@ export default function KPIs() {
   };
 
   const filteredKpis = kpis.filter(kpi => {
-    if (categoryFilter === 'all') return true;
-    return kpi.category === categoryFilter;
+    if (categoryFilter !== 'all' && kpi.category !== categoryFilter) return false;
+    
+    if (statusFilter !== 'all') {
+      const progress = kpi.target_value > 0 
+        ? (parseFloat(kpi.current_value) / parseFloat(kpi.target_value)) * 100 
+        : 0;
+      if (statusFilter === 'on_track' && progress < 95) return false;
+      if (statusFilter === 'near_target' && (progress < 90 || progress >= 95)) return false;
+      if (statusFilter === 'needs_attention' && progress >= 90) return false;
+    }
+    
+    return true;
   });
 
   // Trend data - fetch from sales chart
@@ -327,6 +338,24 @@ export default function KPIs() {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-4">
+          {/* Active Filter Indicator */}
+          {statusFilter !== 'all' && (
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center justify-between">
+              <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                <Filter className="w-5 h-5" />
+                <span className="font-medium">
+                  Showing {statusFilter === 'on_track' ? 'On Track' : statusFilter === 'near_target' ? 'Near Target' : 'Needs Attention'} KPIs
+                </span>
+              </div>
+              <button
+                onClick={() => setStatusFilter('all')}
+                className="px-3 py-1 text-sm bg-blue-200 dark:bg-blue-800 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-300 dark:hover:bg-blue-700 transition"
+              >
+                Clear Filter
+              </button>
+            </div>
+          )}
+
           {/* KPI Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredKpis.map((kpi) => {
@@ -393,7 +422,14 @@ export default function KPIs() {
           <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Performance Summary</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg border border-green-100 dark:border-green-800">
+              <div 
+                onClick={() => setStatusFilter(statusFilter === 'on_track' ? 'all' : 'on_track')}
+                className={`p-4 rounded-lg border cursor-pointer transition-all hover:scale-105 hover:shadow-md ${
+                  statusFilter === 'on_track' 
+                    ? 'bg-green-100 dark:bg-green-900/50 border-green-300 dark:border-green-700' 
+                    : 'bg-green-50 dark:bg-green-900/30 border-green-100 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/40'
+                }`}
+              >
                 <div className="flex items-center gap-2 text-green-700 font-medium mb-2">
                   <TrendingUp className="w-5 h-5" />
                   On Track
@@ -401,7 +437,14 @@ export default function KPIs() {
                 <div className="text-3xl font-bold text-green-800">{summary.on_track || 0}</div>
                 <div className="text-sm text-green-600">KPIs meeting or exceeding targets</div>
               </div>
-              <div className="p-4 bg-amber-50 dark:bg-amber-900/30 rounded-lg border border-amber-100 dark:border-amber-800">
+              <div 
+                onClick={() => setStatusFilter(statusFilter === 'near_target' ? 'all' : 'near_target')}
+                className={`p-4 rounded-lg border cursor-pointer transition-all hover:scale-105 hover:shadow-md ${
+                  statusFilter === 'near_target' 
+                    ? 'bg-amber-100 dark:bg-amber-900/50 border-amber-300 dark:border-amber-700' 
+                    : 'bg-amber-50 dark:bg-amber-900/30 border-amber-100 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/40'
+                }`}
+              >
                 <div className="flex items-center gap-2 text-amber-700 font-medium mb-2">
                   <Target className="w-5 h-5" />
                   Near Target
@@ -409,7 +452,14 @@ export default function KPIs() {
                 <div className="text-3xl font-bold text-amber-800">{summary.near_target || 0}</div>
                 <div className="text-sm text-amber-600">KPIs within 5% of target</div>
               </div>
-              <div className="p-4 bg-red-50 dark:bg-red-900/30 rounded-lg border border-red-100 dark:border-red-800">
+              <div 
+                onClick={() => setStatusFilter(statusFilter === 'needs_attention' ? 'all' : 'needs_attention')}
+                className={`p-4 rounded-lg border cursor-pointer transition-all hover:scale-105 hover:shadow-md ${
+                  statusFilter === 'needs_attention' 
+                    ? 'bg-red-100 dark:bg-red-900/50 border-red-300 dark:border-red-700' 
+                    : 'bg-red-50 dark:bg-red-900/30 border-red-100 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/40'
+                }`}
+              >
                 <div className="flex items-center gap-2 text-red-700 font-medium mb-2">
                   <TrendingDown className="w-5 h-5" />
                   Needs Attention

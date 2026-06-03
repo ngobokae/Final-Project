@@ -45,11 +45,9 @@ export default function CommandPalette() {
     { title: 'Audit Logs', route: '/admin/audit-logs', icon: Activity, category: 'Admin' },
 
     // Operations
-    { title: 'Sales Data', route: '/operations/sales-data', icon: BarChart3, category: 'Operations' },
     { title: 'Demand Forecast', route: '/operations/demand-forecast', icon: Zap, category: 'Operations' },
     { title: 'Production Planning', route: '/operations/production-plan', icon: ClipboardList, category: 'Operations' },
     { title: 'Procurement Planning', route: '/operations/procurement-plan', icon: ShoppingCart, category: 'Operations' },
-    { title: 'Operations Reports', route: '/operations/reports', icon: FileText, category: 'Operations' },
 
     // Inventory
     { title: 'Stock Overview', route: '/inventory/stock-overview', icon: Box, category: 'Inventory' },

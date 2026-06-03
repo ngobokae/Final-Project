@@ -18,6 +18,12 @@ export default function Header() {
   const [notifItems, setNotifItems] = useState([]);
   const [notifCount, setNotifCount] = useState(0);
   const [toasts, setToasts] = useState([]);
+  const [subscriptions, setSubscriptions] = useState({
+    alert_inventory: true,
+    alert_forecast_failures: true,
+    alert_supplier_updates: true,
+  });
+  const [showManage, setShowManage] = useState(false);
 
   const lastSeenAuditKey = useMemo(() => {
     const uid = user?.id ? String(user.id) : 'anon';
@@ -133,7 +139,7 @@ export default function Header() {
       // 3) Forecast updates for operations/executive
       let forecastItems = [];
       let newForecastCount = 0;
-      if (user.role === 'operations' || user.role === 'executive') {
+      if (user.role === 'operations' || user.role === 'executive' || user.role === 'operations_manager') {
         const forecastRes = await apiGet('/api/forecast?days=30');
         const forecasts = Array.isArray(forecastRes?.forecasts) ? forecastRes.forecasts : [];
 
@@ -200,8 +206,35 @@ export default function Header() {
     // Avoid spamming: only run when role changes.
     if (!user?.role) return;
     loadNotifications();
+    loadSubscriptions().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.role]);
+
+  const loadSubscriptions = async () => {
+    try {
+      const res = await apiGet('/api/users/me/preferences');
+      const prefs = res?.preferences || {};
+      setSubscriptions({
+        alert_inventory: prefs.alert_inventory !== undefined ? !!prefs.alert_inventory : true,
+        alert_forecast_failures: prefs.alert_forecast_failures !== undefined ? !!prefs.alert_forecast_failures : true,
+        alert_supplier_updates: prefs.alert_supplier_updates !== undefined ? !!prefs.alert_supplier_updates : true,
+      });
+    } catch (e) {
+      // fallback to defaults already set
+    }
+  };
+
+  const saveSubscriptions = async (next) => {
+    try {
+      await apiPut('/api/users/me/preferences', next);
+      setSubscriptions(next);
+      window.dispatchEvent(new Event('app:notifications-changed'));
+      window.dispatchEvent(new CustomEvent('app:toast', { detail: { type: 'success', title: 'Subscriptions Saved', description: 'Notification preferences updated.' } }));
+    } catch (e) {
+      console.error('Failed to save subscriptions', e);
+      window.dispatchEvent(new CustomEvent('app:toast', { detail: { type: 'error', title: 'Save Failed', description: 'Could not save notification settings.' } }));
+    }
+  };
 
   useEffect(() => {
     if (!showNotifications) return;
@@ -210,7 +243,7 @@ export default function Header() {
     if (user?.role === 'admin') {
       localStorage.setItem(lastSeenAuditKey, new Date().toISOString());
     }
-    if (user?.role === 'operations' || user?.role === 'executive') {
+    if (user?.role === 'operations' || user?.role === 'executive' || user?.role === 'operations_manager') {
       localStorage.setItem(lastSeenForecastKey, new Date().toISOString());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -335,14 +368,14 @@ export default function Header() {
 
   return (
     <header className="fixed top-0 right-0 left-72 h-16 bg-white dark:bg-neutral-950/90 border-b border-gray-200 dark:border-neutral-700 z-30 flex items-center justify-between px-6">
-      <div className="flex items-center gap-4 flex-1">
+      <div className="flex items-center gap-4 flex-1 min-w-0">
         <img
           src={logoSrc}
           alt="Kinglion"
           className="h-7 w-auto max-w-[120px] object-contain mr-2"
         />
 
-        <div className="relative flex-1 max-w-md">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
           <input
             type="text"
@@ -352,7 +385,7 @@ export default function Header() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 shrink-0">
         <div className="relative" ref={notificationRef}>
           <button
             onClick={() => setShowNotifications((prev) => !prev)}
@@ -373,6 +406,15 @@ export default function Header() {
           {showNotifications && (
             <div className="absolute right-0 top-12 w-96 max-w-[90vw] rounded-2xl border border-gray-200 bg-white shadow-2xl shadow-black/10 dark:border-neutral-800 dark:bg-neutral-950 overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-neutral-800 bg-gradient-to-r from-neutral-950/5 to-red-50 dark:from-neutral-900 dark:to-neutral-900">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowManage((s) => !s)}
+                    className="text-xs px-2 py-1 rounded-md border border-gray-200 dark:border-neutral-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-800"
+                  >
+                    {showManage ? 'Close' : 'Manage'}
+                  </button>
+                  <div className="text-xs text-gray-500">Subscriptions</div>
+                </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-900 dark:text-neutral-100">Notifications</p>
                   <p className="text-xs text-gray-500 dark:text-neutral-400 capitalize">
@@ -384,75 +426,94 @@ export default function Header() {
                 </span>
               </div>
 
-              <div className="max-h-96 overflow-y-auto">
-                {notifLoading ? (
-                  <div className="px-4 py-6 text-sm text-gray-500 dark:text-neutral-400">
-                    Loading notifications...
+              {showManage ? (
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-neutral-800">
+                  <div className="flex flex-col gap-3">
+                    <label className="flex items-center justify-between text-sm">
+                      <span>Stock Alerts</span>
+                      <input type="checkbox" checked={subscriptions.alert_inventory} onChange={(e) => saveSubscriptions({ ...subscriptions, alert_inventory: e.target.checked })} />
+                    </label>
+                    <label className="flex items-center justify-between text-sm">
+                      <span>Forecast Updates</span>
+                      <input type="checkbox" checked={subscriptions.alert_forecast_failures} onChange={(e) => saveSubscriptions({ ...subscriptions, alert_forecast_failures: e.target.checked })} />
+                    </label>
+                    <label className="flex items-center justify-between text-sm">
+                      <span>Supplier Updates</span>
+                      <input type="checkbox" checked={subscriptions.alert_supplier_updates} onChange={(e) => saveSubscriptions({ ...subscriptions, alert_supplier_updates: e.target.checked })} />
+                    </label>
                   </div>
-                ) : notifError ? (
-                  <div className="px-4 py-6 text-sm text-red-700 dark:text-red-400">
-                    {notifError}
-                  </div>
-                ) : notifItems.length > 0 ? (
-                  notifItems.map((item, index) => (
-                    <button
-                      key={`${item.title}-${index}`}
-                      onClick={(e) => {
-                        if (canOpenNotification(item)) {
-                          handleOpenNotification(item, e);
-                        } else {
-                          handleMarkNotificationRead(item, e);
-                        }
-                      }}
-                      className="w-full text-left px-4 py-3 border-b border-gray-100 dark:border-neutral-800 hover:bg-red-50/70 dark:hover:bg-neutral-900 transition-colors"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div
-                          className={
-                            "mt-1 w-2.5 h-2.5 rounded-full flex-shrink-0 " +
-                            (item.type === 'alert'
-                              ? 'bg-gradient-to-r from-red-700 to-red-500'
-                              : item.type === 'forecast'
-                                ? 'bg-gradient-to-r from-indigo-700 to-blue-500'
-                                : 'bg-gradient-to-r from-neutral-900 to-red-700')
+                </div>
+              ) : (
+                <div className="max-h-96 overflow-y-auto">
+                  {notifLoading ? (
+                    <div className="px-4 py-6 text-sm text-gray-500 dark:text-neutral-400">
+                      Loading notifications...
+                    </div>
+                  ) : notifError ? (
+                    <div className="px-4 py-6 text-sm text-red-700 dark:text-red-400">
+                      {notifError}
+                    </div>
+                  ) : notifItems.length > 0 ? (
+                    notifItems.map((item, index) => (
+                      <button
+                        key={`${item.title}-${index}`}
+                        onClick={(e) => {
+                          if (canOpenNotification(item)) {
+                            handleOpenNotification(item, e);
+                          } else {
+                            handleMarkNotificationRead(item, e);
                           }
-                        ></div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
-                            {item.title}
-                          </p>
-                          <p className="text-sm text-gray-600 dark:text-neutral-400 mt-1">
-                            {item.message}
-                          </p>
-                          <p className="text-xs text-red-700 dark:text-red-400 mt-2 font-medium">
-                            {item.time}
-                          </p>
-                          <div className="mt-2 flex items-center gap-2">
-                            {canOpenNotification(item) && (
+                        }}
+                        className="w-full text-left px-4 py-3 border-b border-gray-100 dark:border-neutral-800 hover:bg-red-50/70 dark:hover:bg-neutral-900 transition-colors"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={
+                              "mt-1 w-2.5 h-2.5 rounded-full flex-shrink-0 " +
+                              (item.type === 'alert'
+                                ? 'bg-gradient-to-r from-red-700 to-red-500'
+                                : item.type === 'forecast'
+                                  ? 'bg-gradient-to-r from-indigo-700 to-blue-500'
+                                  : 'bg-gradient-to-r from-neutral-900 to-red-700')
+                            }
+                          ></div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
+                              {item.title}
+                            </p>
+                            <p className="text-sm text-gray-600 dark:text-neutral-400 mt-1">
+                              {item.message}
+                            </p>
+                            <p className="text-xs text-red-700 dark:text-red-400 mt-2 font-medium">
+                              {item.time}
+                            </p>
+                            <div className="mt-2 flex items-center gap-2">
+                              {canOpenNotification(item) && (
+                                <button
+                                  onClick={(e) => handleOpenNotification(item, e)}
+                                  className="text-xs px-2 py-1 rounded-md border border-gray-300 dark:border-neutral-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-800"
+                                >
+                                  Open
+                                </button>
+                              )}
                               <button
-                                onClick={(e) => handleOpenNotification(item, e)}
-                                className="text-xs px-2 py-1 rounded-md border border-gray-300 dark:border-neutral-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-800"
+                                onClick={(e) => handleMarkNotificationRead(item, e)}
+                                className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-neutral-800"
                               >
-                                Open
+                                Read
                               </button>
-                            )}
-                            <button
-                              onClick={(e) => handleMarkNotificationRead(item, e)}
-                              className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-neutral-800"
-                            >
-                              Read
-                            </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </button>
-                  ))
-                ) : (
-                  <div className="px-4 py-6 text-sm text-gray-500 dark:text-neutral-400">
-                    No notifications available for this role.
-                  </div>
-                )}
-              </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-4 py-6 text-sm text-gray-500 dark:text-neutral-400">
+                      No notifications available for this role.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

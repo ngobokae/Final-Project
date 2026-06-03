@@ -59,6 +59,10 @@ export default function ProductionPlan() {
 
   const handleAddManualPlan = async (e) => {
     e.preventDefault();
+    if (!newPlan.product_id) {
+      alert('Please select a product before creating the production plan.');
+      return;
+    }
     try {
       const token = localStorage.getItem('token');
       const response = await fetch('http://localhost:3001/api/production', {
@@ -86,6 +90,9 @@ export default function ProductionPlan() {
     try {
       const data = await apiGet('/api/products?limit=100');
       setProducts(data.products || []);
+      if (!newPlan.product_id && Array.isArray(data.products) && data.products.length > 0) {
+        setNewPlan((prev) => ({ ...prev, product_id: data.products[0].id }));
+      }
     } catch (e) {
       console.error('Fetch products failed', e);
     }
@@ -303,9 +310,13 @@ export default function ProductionPlan() {
                 <Button type="button" variant="ghost" className="flex-1" onClick={() => setShowAddModal(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-700">
+                <button
+                  type="button"
+                  onClick={handleAddManualPlan}
+                  className="flex-1 inline-flex items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-all"
+                >
                   Create Plan
-                </Button>
+                </button>
               </div>
             </form>
           </div>

@@ -226,7 +226,7 @@ export const handleCreateUser = async (req, res) => {
       return sendError(res, 400, 'Please enter a valid email address');
     }
 
-    if (!['admin', 'operations', 'inventory', 'executive'].includes(role)) {
+    if (!['admin', 'operations', 'inventory', 'executive', 'operations_manager'].includes(role)) {
       return sendError(res, 400, 'Invalid role');
     }
 
@@ -285,7 +285,7 @@ export const handleUpdateUser = async (req, res) => {
       values.push(name);
     }
     if (role !== undefined) {
-      if (!['admin', 'operations', 'inventory', 'executive'].includes(role)) {
+      if (!['admin', 'operations', 'inventory', 'executive', 'operations_manager'].includes(role)) {
         return sendError(res, 400, 'Invalid role');
       }
       updates.push('role = ?');
@@ -343,6 +343,7 @@ export const handleUpdateMyPreferences = async (req, res) => {
       'alert_uploads',
       'alert_inventory',
       'alert_forecast_failures',
+      'alert_supplier_updates',
       'digest',
       'avatar_color',
     ];

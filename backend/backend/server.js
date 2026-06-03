@@ -58,9 +58,9 @@ const routes = {
   // Product routes
   'GET /api/products': { handler: productRoutes.handleGetProducts, auth: true, permission: { resource: 'products', action: 'view' } },
   'GET /api/products/:id': { handler: productRoutes.handleGetProduct, auth: true, permission: { resource: 'products', action: 'view' } },
-  'POST /api/products': { handler: productRoutes.handleCreateProduct, auth: true, roles: ['admin', 'operations', 'inventory'], permission: { resource: 'products', action: 'create' } },
-  'POST /api/products/upload': { handler: productRoutes.handleUploadProducts, auth: true, roles: ['admin', 'operations', 'inventory'], permission: { resource: 'products', action: 'create' } },
-  'PUT /api/products/:id': { handler: productRoutes.handleUpdateProduct, auth: true, roles: ['admin', 'operations', 'inventory'], permission: { resource: 'products', action: 'edit' } },
+  'POST /api/products': { handler: productRoutes.handleCreateProduct, auth: true, roles: ['admin', 'operations', 'inventory', 'inventory_manager'], permission: { resource: 'products', action: 'create' } },
+  'POST /api/products/upload': { handler: productRoutes.handleUploadProducts, auth: true, roles: ['admin', 'operations', 'inventory', 'inventory_manager'], permission: { resource: 'products', action: 'create' } },
+  'PUT /api/products/:id': { handler: productRoutes.handleUpdateProduct, auth: true, roles: ['admin', 'operations', 'inventory', 'inventory_manager'], permission: { resource: 'products', action: 'edit' } },
 
   // Sales routes
   'GET /api/sales': { handler: salesRoutes.handleGetSales, auth: true, permission: { resource: 'sales', action: 'view' } },
@@ -77,18 +77,18 @@ const routes = {
   'GET /api/inventory': { handler: inventoryRoutes.handleGetInventory, auth: true, permission: { resource: 'inventory', action: 'view' } },
   'GET /api/inventory/alerts': { handler: inventoryRoutes.handleGetInventoryAlerts, auth: true, permission: { resource: 'inventory', action: 'view' } },
   'GET /api/inventory/report/csv': { handler: inventoryRoutes.handleExportInventoryCsv, auth: true, permission: { resource: 'inventory', action: 'view' } },
-  'PUT /api/inventory/alerts/:id/resolve': { handler: inventoryRoutes.handleResolveAlert, auth: true, roles: ['admin', 'inventory'], permission: { resource: 'inventory', action: 'edit' } },
-  'GET /api/inventory/history': { handler: inventoryRoutes.handleGetInventoryHistory, auth: true, roles: ['admin', 'inventory'], permission: { resource: 'inventory', action: 'view' } },
-  'GET /api/inventory/transactions': { handler: inventoryRoutes.handleGetInventoryTransactions, auth: true, roles: ['admin', 'inventory', 'operations'], permission: { resource: 'inventory', action: 'view' } },
-  'POST /api/inventory/transactions': { handler: inventoryRoutes.handleCreateInventoryTransaction, auth: true, roles: ['admin', 'inventory', 'operations'], permission: { resource: 'inventory', action: 'edit' } },
-  'PUT /api/inventory/:id': { handler: inventoryRoutes.handleUpdateInventory, auth: true, roles: ['admin', 'inventory'], permission: { resource: 'inventory', action: 'edit' } },
+  'PUT /api/inventory/alerts/:id/resolve': { handler: inventoryRoutes.handleResolveAlert, auth: true, roles: ['admin', 'inventory', 'inventory_manager'], permission: { resource: 'inventory', action: 'edit' } },
+  'GET /api/inventory/history': { handler: inventoryRoutes.handleGetInventoryHistory, auth: true, roles: ['admin', 'inventory', 'inventory_manager'], permission: { resource: 'inventory', action: 'view' } },
+  'GET /api/inventory/transactions': { handler: inventoryRoutes.handleGetInventoryTransactions, auth: true, roles: ['admin', 'inventory', 'operations', 'inventory_manager'], permission: { resource: 'inventory', action: 'view' } },
+  'POST /api/inventory/transactions': { handler: inventoryRoutes.handleCreateInventoryTransaction, auth: true, roles: ['admin', 'inventory', 'operations', 'inventory_manager'], permission: { resource: 'inventory', action: 'edit' } },
+  'PUT /api/inventory/:id': { handler: inventoryRoutes.handleUpdateInventory, auth: true, roles: ['admin', 'inventory', 'inventory_manager'], permission: { resource: 'inventory', action: 'edit' } },
 
   // Forecast routes
   'GET /api/forecast': { handler: forecastRoutes.handleGetForecasts, auth: true, permission: { resource: 'forecasts', action: 'view' } },
-  'POST /api/forecast/generate': { handler: forecastRoutes.handleGenerateForecast, auth: true, roles: ['admin', 'operations', 'executive'], permission: { resource: 'forecasts', action: 'create' } },
-  'DELETE /api/forecast': { handler: forecastRoutes.handleDeleteForecasts, auth: true, roles: ['admin', 'operations', 'executive'], permission: { resource: 'forecasts', action: 'delete' } },
+  'POST /api/forecast/generate': { handler: forecastRoutes.handleGenerateForecast, auth: true, roles: ['admin', 'operations', 'executive', 'operations_manager'], permission: { resource: 'forecasts', action: 'create' } },
+  'DELETE /api/forecast': { handler: forecastRoutes.handleDeleteForecasts, auth: true, roles: ['admin', 'operations', 'executive', 'operations_manager'], permission: { resource: 'forecasts', action: 'delete' } },
   'GET /api/forecast/recommendations': { handler: forecastRoutes.handleGetInventoryRecommendations, auth: true, permission: { resource: 'forecasts', action: 'view' } },
-  'POST /api/forecast/recommendations': { handler: forecastRoutes.handleGenerateRecommendations, auth: true, roles: ['admin', 'inventory', 'executive'], permission: { resource: 'forecasts', action: 'create' } },
+  'POST /api/forecast/recommendations': { handler: forecastRoutes.handleGenerateRecommendations, auth: true, roles: ['admin', 'inventory', 'executive', 'operations_manager'], permission: { resource: 'forecasts', action: 'create' } },
 
   // Demand models (shared)
   'GET /api/demand-models': { handler: demandModelsRoutes.handleGetDemandModels, auth: true, permission: { resource: 'forecasts', action: 'view' } },
@@ -130,9 +130,9 @@ const routes = {
   'GET /api/procurement/trends': { handler: procurementRoutes.handleGetProcurementCostTrends, auth: true },
   'GET /api/procurement/recommendations': { handler: dashboardRoutes.handleGetProcurementRecommendations, auth: true },
   'GET /api/procurement/:id': { handler: procurementRoutes.handleGetProcurementOrder, auth: true },
-  'POST /api/procurement': { handler: procurementRoutes.handleCreateProcurementOrder, auth: true, roles: ['admin', 'operations', 'inventory'] },
-  'PUT /api/procurement/:id': { handler: procurementRoutes.handleUpdateProcurementOrder, auth: true, roles: ['admin', 'operations'] },
-  'DELETE /api/procurement/:id': { handler: procurementRoutes.handleDeleteProcurementOrder, auth: true, roles: ['admin', 'operations'] },
+  'POST /api/procurement': { handler: procurementRoutes.handleCreateProcurementOrder, auth: true, roles: ['admin', 'operations', 'inventory', 'inventory_manager', 'operations_manager'] },
+  'PUT /api/procurement/:id': { handler: procurementRoutes.handleUpdateProcurementOrder, auth: true, roles: ['admin', 'operations', 'operations_manager'] },
+  'DELETE /api/procurement/:id': { handler: procurementRoutes.handleDeleteProcurementOrder, auth: true, roles: ['admin', 'operations', 'operations_manager'] },
 
   // KPI routes
   'GET /api/kpis': { handler: kpisRoutes.handleGetKPIs, auth: true, permission: { resource: 'reports', action: 'view' } },
@@ -176,6 +176,8 @@ const routes = {
   'GET /api/reports/demand-forecast': { handler: reportsRoutes.handleGenerateDemandForecastReport, auth: true, permission: { resource: 'reports', action: 'view' } },
   'GET /api/reports/stock-level': { handler: reportsRoutes.handleGenerateStockLevelReport, auth: true, permission: { resource: 'reports', action: 'view' } },
   'GET /api/reports/inventory-valuation': { handler: reportsRoutes.handleGenerateInventoryValuationReport, auth: true, permission: { resource: 'reports', action: 'view' } },
+  'GET /api/reports/inventory-forecast-errors': { handler: reportsRoutes.handleGenerateInventoryForecastErrorReport, auth: true, permission: { resource: 'reports', action: 'view' } },
+  'GET /api/reports/inventory-abc-analysis': { handler: reportsRoutes.handleGenerateInventoryABCAnalysisReport, auth: true, permission: { resource: 'reports', action: 'view' } },
   'GET /api/reports/executive-summary': { handler: reportsRoutes.handleGenerateExecutiveSummary, auth: true, permission: { resource: 'reports', action: 'view' } },
   'GET /api/reports/financial': { handler: reportsRoutes.handleGenerateFinancialReport, auth: true, permission: { resource: 'reports', action: 'view' } },
 
