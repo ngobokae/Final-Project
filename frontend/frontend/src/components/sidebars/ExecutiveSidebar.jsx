@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { BarChart3, Target, Lightbulb, FileText, ChevronRight, User, MessageSquare, Brain, Loader2, Download, Calculator } from 'lucide-react';
+import { BarChart3, Target, Lightbulb, FileText, ChevronRight, User, MessageSquare, Brain, Loader2, Download, Calculator, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import logoSrc from '../../assets/IMG_1472.PNG';
 import { apiGet } from '../../utils/api';
 import { generateBusinessReport } from '../../utils/reportGenerator';
 
-export default function ExecutiveSidebar() {
+export default function ExecutiveSidebar({ open = false, onClose }) {
   const { user } = useAuth();
   const [insightsCount, setInsightsCount] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -85,8 +85,20 @@ export default function ExecutiveSidebar() {
   ];
 
   return (
-    <aside className="fixed left-0 top-0 w-72 bg-gradient-to-b from-neutral-950 via-neutral-900 to-red-800 text-white h-screen overflow-y-auto z-40 border-r border-red-950/50 shadow-2xl">
-      <div className="p-6 border-b border-neutral-800 bg-neutral-950/50 backdrop-blur-sm">
+    <aside
+      className={`fixed left-0 top-0 w-72 bg-gradient-to-b from-neutral-950 via-neutral-900 to-red-800 text-white h-screen overflow-y-auto z-50 border-r border-red-950/50 shadow-2xl transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+        open ? 'translate-x-0' : '-translate-x-full'
+      }`}
+    >
+      <div className="relative p-6 border-b border-neutral-800 bg-neutral-950/50 backdrop-blur-sm">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close navigation menu"
+          className="lg:hidden absolute top-4 right-4 p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
         <div className="flex items-center gap-3 mb-2">
           <img
             src={logoSrc}

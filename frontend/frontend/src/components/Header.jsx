@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, Bell, Search, FileText, Loader2 } from 'lucide-react';
+import { LogOut, Bell, Search, FileText, Loader2, Menu } from 'lucide-react';
 import { Button } from './ui/button';
 import { useNavigate } from 'react-router-dom';
 import logoSrc from '../assets/IMG_1472.PNG';
@@ -8,7 +8,7 @@ import { apiGet, apiPut, API_BASE_URL } from '../utils/api';
 import { io } from 'socket.io-client';
 import Toast from './ui/Toast';
 
-export default function Header() {
+export default function Header({ onMenuClick }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
@@ -334,12 +334,20 @@ export default function Header() {
   };
 
   return (
-    <header className="fixed top-0 right-0 left-72 h-16 bg-white dark:bg-neutral-950/90 border-b border-gray-200 dark:border-neutral-700 z-30 flex items-center justify-between px-6">
-      <div className="flex items-center gap-4 flex-1">
+    <header className="fixed top-0 right-0 left-0 lg:left-72 h-16 bg-white/95 dark:bg-neutral-950/90 backdrop-blur-sm border-b border-gray-200 dark:border-neutral-700 z-30 flex items-center justify-between px-4 sm:px-6">
+      <div className="flex items-center gap-3 sm:gap-4 flex-1">
+        <button
+          type="button"
+          onClick={onMenuClick}
+          aria-label="Open navigation menu"
+          className="lg:hidden -ml-1 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors dark:text-gray-400 dark:hover:text-white dark:hover:bg-neutral-800"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
         <img
           src={logoSrc}
           alt="Kinglion"
-          className="h-7 w-auto max-w-[120px] object-contain mr-2"
+          className="h-7 w-auto max-w-[120px] object-contain mr-1 sm:mr-2"
         />
 
         <div className="relative flex-1 max-w-md">
