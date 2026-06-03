@@ -193,7 +193,7 @@ export default function OperationsDashboard() {
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh Data
           </Button>
-          <Button className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/25 gap-1.5 text-white" asChild>
+          <Button className="bg-gradient-to-r from-neutral-900 to-red-800 hover:from-black hover:to-red-900 shadow-lg shadow-black/10 gap-1.5 text-white" asChild>
             <Link to="/operations/production-plan">
               <Factory className="w-4 h-4" />
               Manage Production
@@ -308,7 +308,7 @@ export default function OperationsDashboard() {
               <Button
                 onClick={handleGenerateFromForecasts}
                 disabled={generating}
-                className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-lg shadow-blue-500/20 text-xs px-4 py-2 font-semibold"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5 shadow-lg shadow-red-900/20 text-xs px-4 py-2 font-semibold"
               >
                 <Brain className="w-3.5 h-3.5" />
                 {generating ? 'Orchestrating...' : 'AI Auto-Suggest Plans'}
@@ -455,7 +455,7 @@ export default function OperationsDashboard() {
             ) : (
               <>
                 <p className="text-sm text-gray-500 py-2">Run Predict 2 (Sales) to generate demand forecasts; production suggestions will appear here.</p>
-                <Button className="w-full mt-4 text-white bg-blue-600 hover:bg-blue-700 shadow shadow-blue-500/10 font-semibold" asChild>
+                <Button className="w-full mt-4 text-primary-foreground bg-primary hover:bg-primary/90 shadow shadow-red-900/10 font-semibold" asChild>
                   <Link to="/operations/sales-data">Go to Sales Data</Link>
                 </Button>
               </>

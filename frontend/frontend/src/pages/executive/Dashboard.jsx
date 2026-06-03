@@ -16,7 +16,7 @@ import {
 } from 'recharts';
 import { apiGet } from '../../utils/api';
 import { formatCurrency } from '../../utils/currency';
-import { getChartTheme, AreaGradient, getAxisProps, getGridProps, getTooltipProps } from '../../utils/chartStyles';
+import { getChartTheme, AreaGradient, getAxisProps, getGridProps, getTooltipProps, CHART_COLORS } from '../../utils/chartStyles';
 import { useNavigate } from 'react-router-dom';
 
 export default function ExecutiveDashboard() {
@@ -644,7 +644,7 @@ export default function ExecutiveDashboard() {
                     {regionalData.length > 0 ? (
                       <PieChart width={320} height={200}>
                         <Pie
-                          data={regionalData.map((r, idx) => ({ ...r, color: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'][idx % 5] }))}
+                          data={regionalData.map((r, idx) => ({ ...r, color: CHART_COLORS[idx % CHART_COLORS.length] }))}
                           cx="50%"
                           cy="50%"
                           innerRadius={60}
@@ -653,10 +653,11 @@ export default function ExecutiveDashboard() {
                           dataKey="value"
                         >
                           {regionalData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'][index % 5]} />
+                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip 
+                        <Tooltip
+                          {...getTooltipProps()}
                           formatter={(value, name, props) => {
                             const revenue = props?.payload?.revenue ?? 0;
                             return [`${value}% (${formatCurrency(revenue)})`, name];
@@ -670,8 +671,7 @@ export default function ExecutiveDashboard() {
 
                   <div className="space-y-3">
                     {regionalData.length > 0 ? regionalData.map((region, index) => {
-                      const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
-                      const regionColor = colors[index % colors.length];
+                      const regionColor = CHART_COLORS[index % CHART_COLORS.length];
                       return (
                         <div key={index} className="flex items-center justify-between text-sm">
                           <div className="flex items-center gap-2">
@@ -1125,13 +1125,13 @@ export default function ExecutiveDashboard() {
                         { name: 'Current Base', Revenue: baseRevenue, Profit: baseProfit },
                         { name: 'Simulated Scenario', Revenue: simulatedProjections.revenue, Profit: simulatedProjections.profit }
                       ]}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="name" />
-                        <YAxis tickFormatter={(val) => `FRW ${val/1000000}M`} />
-                        <Tooltip formatter={(val) => formatCurrency(val)} />
+                        <CartesianGrid {...getGridProps()} vertical={false} />
+                        <XAxis dataKey="name" {...getAxisProps()} />
+                        <YAxis tickFormatter={(val) => `FRW ${val/1000000}M`} {...getAxisProps()} />
+                        <Tooltip {...getTooltipProps()} formatter={(val) => formatCurrency(val)} />
                         <Legend />
-                        <Bar dataKey="Revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="Profit" fill="#10b981" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="Revenue" fill={CHART_COLORS[4]} radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="Profit" fill={CHART_COLORS[2]} radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>

@@ -31,6 +31,7 @@ import {
 import { apiGet, apiPost } from '../../utils/api';
 import { formatCurrency } from '../../utils/currency';
 import { useNavigate } from 'react-router-dom';
+import { getGridProps, getAxisProps, getTooltipProps, CHART_COLORS } from '../../utils/chartStyles';
 
 export default function InventoryDashboard() {
   const navigate = useNavigate();
@@ -214,7 +215,7 @@ export default function InventoryDashboard() {
     return { category, items, value, turnover: metrics.turnoverRate || 0, stockHealth: Math.min(100, 50 + pct) };
   }).sort((a, b) => b.value - a.value);
 
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
+  const COLORS = CHART_COLORS;
   const warehouseData = categoryPerformance.slice(0, 8).map((cat, i) => ({
     name: cat.category,
     items: cat.items,
@@ -547,7 +548,7 @@ export default function InventoryDashboard() {
                               <Cell key={`cell-${index}`} fill={entry.color} />
                             ))}
                           </Pie>
-                          <Tooltip formatter={(value) => formatCurrency(value)} />
+                          <Tooltip {...getTooltipProps()} formatter={(value) => formatCurrency(value)} />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
@@ -595,12 +596,12 @@ export default function InventoryDashboard() {
                             <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.1}/>
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                        <YAxis allowDecimals={false} axisLine={false} tickLine={false} />
-                        <Tooltip 
-                          cursor={{ fill: 'rgba(59, 130, 246, 0.05)' }}
-                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                        <CartesianGrid {...getGridProps()} vertical={false} />
+                        <XAxis dataKey="name" {...getAxisProps()} axisLine={false} tickLine={false} />
+                        <YAxis allowDecimals={false} {...getAxisProps()} axisLine={false} tickLine={false} />
+                        <Tooltip
+                          {...getTooltipProps()}
+                          cursor={{ fill: 'rgba(120, 120, 120, 0.06)' }}
                         />
                         <Bar dataKey="items" fill="url(#barGradient)" name="Items" radius={[6, 6, 0, 0]} />
                       </BarChart>
@@ -626,12 +627,12 @@ export default function InventoryDashboard() {
                   {forecastTrendData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={forecastTrendData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey="date" />
-                        <YAxis allowDecimals={false} />
-                        <Tooltip />
+                        <CartesianGrid {...getGridProps()} />
+                        <XAxis dataKey="date" {...getAxisProps()} />
+                        <YAxis allowDecimals={false} {...getAxisProps()} />
+                        <Tooltip {...getTooltipProps()} />
                         <Legend />
-                        <Line type="monotone" dataKey="demand" stroke="#8b5cf6" strokeWidth={2} name="Forecasted Demand" dot={false} />
+                        <Line type="monotone" dataKey="demand" stroke={CHART_COLORS[5]} strokeWidth={2} name="Forecasted Demand" dot={false} />
                       </LineChart>
                     </ResponsiveContainer>
                   ) : (
