@@ -96,6 +96,27 @@ export const getTooltipProps = () => {
   };
 };
 
+// Brand-aligned categorical palette for charts (mirrors the --color-chart-*
+// tokens in index.css). Red-led and neutral-anchored so charts read as part of
+// the KINGLION brand instead of a random rainbow. Use by index, cycling.
+export const CHART_COLORS = [
+  '#dc2626', // brand red
+  '#f59e0b', // amber
+  '#16a34a', // green
+  '#6b7280', // neutral gray (legible on light + dark)
+  '#3b82f6', // blue
+  '#8b5cf6', // violet
+];
+
+// Semantic chart colors for meaning-bearing series.
+export const CHART_SEMANTIC = {
+  positive: '#16a34a',
+  negative: '#dc2626',
+  warning: '#f59e0b',
+  info: '#3b82f6',
+  neutral: '#6b7280',
+};
+
 // Legacy exports for backward compatibility (use theme-aware versions)
 export const axisProps = getAxisProps();
 export const gridProps = getGridProps();

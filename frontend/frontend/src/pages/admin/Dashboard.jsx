@@ -14,6 +14,11 @@ import {
 } from 'recharts';
 import { apiGet, apiDelete, API_BASE_URL } from '../../utils/api';
 import { useNavigate } from 'react-router-dom';
+import { PageHeader } from '../../components/ui/PageHeader';
+import { StatCard } from '../../components/ui/StatCard';
+import { SkeletonStatCard, SkeletonCard, Skeleton } from '../../components/ui/skeleton';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { getGridProps, getAxisProps, getTooltipProps, CHART_COLORS } from '../../utils/chartStyles';
 
 const TIME_RANGES = [
   { id: '1d', label: '24h', days: 1 },
@@ -178,8 +183,7 @@ export default function AdminDashboard() {
       trend: userTrend.trend,
       subtitle: `${stats.activeUsers} active users`,
       icon: Users,
-      bgGradient: 'from-blue-500/10 to-blue-600/10',
-      iconBg: 'bg-blue-500',
+      accent: 'info',
       to: '/admin/users',
       hint: 'View all users',
     },
@@ -190,8 +194,7 @@ export default function AdminDashboard() {
       trend: uploadTrendBadge.trend,
       subtitle: `+${stats.recentUploads} this week`,
       icon: Upload,
-      bgGradient: 'from-emerald-500/10 to-emerald-600/10',
-      iconBg: 'bg-emerald-500',
+      accent: 'success',
       to: '/admin/audit-logs?view=uploads',
       hint: 'View upload activity',
     },
@@ -202,8 +205,7 @@ export default function AdminDashboard() {
       trend: 'neutral',
       subtitle: `${stats.activeModels} actively running`,
       icon: Brain,
-      bgGradient: 'from-purple-500/10 to-purple-600/10',
-      iconBg: 'bg-purple-500',
+      accent: 'brand',
       to: '/admin/ai-models',
       hint: 'Manage AI models',
     },
@@ -214,8 +216,7 @@ export default function AdminDashboard() {
       trend: healthTrend.trend,
       subtitle: stats.systemHealth >= 90 ? 'Optimal performance' : 'Needs attention',
       icon: Activity,
-      bgGradient: 'from-green-500/10 to-green-600/10',
-      iconBg: 'bg-green-500',
+      accent: stats.systemHealth >= 90 ? 'success' : 'warning',
       to: '/admin/system-settings#system-health',
       hint: 'System settings & health',
     },
@@ -226,8 +227,7 @@ export default function AdminDashboard() {
       trend: stats.alerts > 0 ? 'down' : 'up',
       subtitle: stats.alerts > 0 ? 'Review required' : 'All clear',
       icon: AlertTriangle,
-      bgGradient: 'from-amber-500/10 to-amber-600/10',
-      iconBg: 'bg-amber-500',
+      accent: stats.alerts > 0 ? 'warning' : 'success',
       to: '/admin/audit-logs',
       hint: 'View system alerts',
     },
@@ -271,10 +271,22 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading dashboard...</p>
+      <div className="space-y-8" aria-busy="true" aria-label="Loading dashboard">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <Skeleton className="h-9 w-64" />
+            <Skeleton className="mt-2 h-4 w-80" />
+          </div>
+          <Skeleton className="h-9 w-48" />
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <SkeletonStatCard key={i} />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <SkeletonCard className="lg:col-span-2" />
+          <SkeletonCard />
         </div>
       </div>
     );
@@ -282,45 +294,40 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-neutral-100 dark:to-neutral-400 bg-clip-text text-transparent">
-            Admin Dashboard
-          </h1>
-          <p className="text-gray-500 mt-2">System overview and management center</p>
-        </div>
-        <div className="flex flex-wrap gap-2 items-center">
-          <div className="flex rounded-lg border border-gray-200 dark:border-neutral-700 overflow-hidden">
-            {TIME_RANGES.map((tr) => (
-              <button
-                key={tr.id}
-                type="button"
-                onClick={() => setTimeRange(tr.id)}
-                className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  timeRange === tr.id
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white dark:bg-neutral-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-neutral-800'
-                }`}
-              >
-                {tr.label}
-              </button>
-            ))}
-          </div>
-          <Button variant="outline" className="gap-2" onClick={fetchDashboardData}>
-            <Clock className="w-4 h-4" />
-            Refresh
-          </Button>
-          <Button
-            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/30"
-            onClick={() => navigate('/admin/audit-logs')}
-          >
-            <Server className="w-4 h-4 mr-2" />
-            System Report
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Admin Dashboard"
+        description="System overview and management center"
+        actions={
+          <>
+            <div className="flex overflow-hidden rounded-lg border border-gray-200 dark:border-neutral-700">
+              {TIME_RANGES.map((tr) => (
+                <button
+                  key={tr.id}
+                  type="button"
+                  onClick={() => setTimeRange(tr.id)}
+                  className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    timeRange === tr.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-white text-gray-600 hover:bg-gray-50 dark:bg-neutral-900 dark:text-gray-400 dark:hover:bg-neutral-800'
+                  }`}
+                >
+                  {tr.label}
+                </button>
+              ))}
+            </div>
+            <Button variant="outline" className="gap-2" onClick={fetchDashboardData}>
+              <Clock className="w-4 h-4" />
+              Refresh
+            </Button>
+            <Button onClick={() => navigate('/admin/audit-logs')}>
+              <Server className="w-4 h-4 mr-2" />
+              System Report
+            </Button>
+          </>
+        }
+      />
 
-      <div className="flex flex-wrap gap-3 p-4 rounded-xl bg-gradient-to-r from-gray-50 to-blue-50/50 dark:from-neutral-900 dark:to-neutral-800 border border-gray-200 dark:border-neutral-700">
+      <div className="flex flex-wrap gap-3 p-4 rounded-xl bg-gradient-to-r from-gray-50 to-red-50/40 dark:from-neutral-900 dark:to-neutral-800 border border-gray-200 dark:border-neutral-700">
         <span className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 self-center mr-2">Services</span>
         <ServiceDot ok={services.database} label="Database" />
         <ServiceDot ok={services.api} label="API Server" />
@@ -347,45 +354,20 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        {metrics.map((metric, idx) => {
-          const Icon = metric.icon;
-          const TrendIcon = metric.trend === 'up' ? TrendingUp : metric.trend === 'down' ? TrendingDown : Activity;
-          return (
-            <Card
-              key={idx}
-              role="button"
-              tabIndex={0}
-              aria-label={`${metric.title}: ${metric.value}. ${metric.hint}`}
-              onClick={() => handleMetricClick(metric.to)}
-              onKeyDown={(e) => handleMetricKeyDown(e, metric.to)}
-              className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group cursor-pointer dark:bg-neutral-900 focus-visible:ring-2 focus-visible:ring-blue-500"
-            >
-              <div className={`absolute inset-0 bg-gradient-to-br ${metric.bgGradient} opacity-50 group-hover:opacity-70 transition-opacity`} />
-              <CardContent className="p-5 relative">
-                <div className="flex items-start justify-between mb-3">
-                  <div className={`p-2.5 rounded-xl ${metric.iconBg} shadow-lg`}>
-                    <Icon className="w-5 h-5 text-white" />
-                  </div>
-                  <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                    metric.trend === 'up' ? 'bg-green-100 text-green-700' :
-                    metric.trend === 'down' ? 'bg-red-100 text-red-700' :
-                    'bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-gray-300'
-                  }`}>
-                    <TrendIcon className="w-3 h-3" />
-                    {metric.change}
-                  </div>
-                </div>
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-400">{metric.title}</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{metric.value}</p>
-                <p className="text-[10px] text-gray-500 mt-0.5">{metric.subtitle}</p>
-                <p className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-blue-600 dark:text-blue-400">
-                  {metric.hint}
-                  <ArrowRight className="w-3 h-3" />
-                </p>
-              </CardContent>
-            </Card>
-          );
-        })}
+        {metrics.map((metric, idx) => (
+          <StatCard
+            key={idx}
+            title={metric.title}
+            value={metric.value}
+            icon={metric.icon}
+            trend={metric.trend}
+            change={metric.change}
+            subtitle={metric.subtitle}
+            hint={metric.hint}
+            accent={metric.accent}
+            onClick={() => handleMetricClick(metric.to)}
+          />
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -476,17 +458,22 @@ export default function AdminDashboard() {
             {userGrowthData.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <AreaChart data={userGrowthData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} />
-                  <YAxis stroke="#9ca3af" fontSize={12} />
-                  <Tooltip />
+                  <CartesianGrid {...getGridProps()} />
+                  <XAxis dataKey="month" {...getAxisProps()} />
+                  <YAxis {...getAxisProps()} />
+                  <Tooltip {...getTooltipProps()} />
                   <Legend />
-                  <Area type="monotone" dataKey="users" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} name="Total" />
-                  <Area type="monotone" dataKey="active" stroke="#10b981" fill="#10b981" fillOpacity={0.15} name="Active est." />
+                  <Area type="monotone" dataKey="users" stroke={CHART_COLORS[4]} fill={CHART_COLORS[4]} fillOpacity={0.2} name="Total" />
+                  <Area type="monotone" dataKey="active" stroke={CHART_COLORS[2]} fill={CHART_COLORS[2]} fillOpacity={0.15} name="Active est." />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-center text-gray-500 py-12 text-sm">No growth data yet</p>
+              <EmptyState
+                compact
+                icon={Users}
+                title="No growth data yet"
+                description="User growth will appear here once accounts are created over time."
+              />
             )}
           </CardContent>
         </Card>
@@ -515,16 +502,21 @@ export default function AdminDashboard() {
                     onClick={(data) => data?.role && navigate(`/admin/users?role=${data.role}`)}
                     style={{ cursor: 'pointer' }}
                   >
-                    {roleDistribution.map((entry) => (
-                      <Cell key={entry.role} fill={entry.color} />
+                    {roleDistribution.map((entry, idx) => (
+                      <Cell key={entry.role} fill={entry.color || CHART_COLORS[idx % CHART_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip {...getTooltipProps()} />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-center text-gray-500 py-12 text-sm">No users</p>
+              <EmptyState
+                compact
+                icon={Users}
+                title="No users"
+                description="Role distribution will appear once users are added."
+              />
             )}
           </CardContent>
         </Card>
@@ -547,15 +539,24 @@ export default function AdminDashboard() {
           </div>
         </CardHeader>
         <CardContent className="p-6">
-          <ResponsiveContainer width="100%" height={240}>
-            <RechartsBarChart data={dataUploadTrend}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="day" fontSize={12} />
-              <YAxis fontSize={12} />
-              <Tooltip />
-              <Bar dataKey="uploads" fill="#10b981" radius={[8, 8, 0, 0]} name="Uploads" />
-            </RechartsBarChart>
-          </ResponsiveContainer>
+          {dataUploadTrend.length > 0 ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <RechartsBarChart data={dataUploadTrend}>
+                <CartesianGrid {...getGridProps()} />
+                <XAxis dataKey="day" {...getAxisProps()} />
+                <YAxis {...getAxisProps()} />
+                <Tooltip {...getTooltipProps()} cursor={{ fill: 'rgba(120,120,120,0.08)' }} />
+                <Bar dataKey="uploads" fill={CHART_COLORS[2]} radius={[8, 8, 0, 0]} name="Uploads" />
+              </RechartsBarChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState
+              compact
+              icon={Upload}
+              title="No upload activity"
+              description="Data uploads from the last 7 days will appear here."
+            />
+          )}
         </CardContent>
       </Card>
 
@@ -645,8 +646,8 @@ export default function AdminDashboard() {
                   onClick={() => setActivityFilter(f)}
                   className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
                     activityFilter === f
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white dark:bg-neutral-900 border-gray-200 dark:border-neutral-600'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-white dark:bg-neutral-900 border-gray-200 dark:border-neutral-600 hover:bg-gray-50 dark:hover:bg-neutral-800'
                   }`}
                 >
                   {f === 'all' ? 'All' : f === 'uploads' ? 'Uploads' : f}
@@ -733,7 +734,7 @@ export default function AdminDashboard() {
                           <span className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                             {session.userName}
                             {session.current && (
-                              <Badge className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded">You</Badge>
+                              <Badge className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded">You</Badge>
                             )}
                           </span>
                           <div className="flex items-center gap-1.5 mt-1">
