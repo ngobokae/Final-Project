@@ -8,6 +8,11 @@ import { apiGet, apiPut, API_BASE_URL } from '../utils/api';
 import { io } from 'socket.io-client';
 import Toast from './ui/Toast';
 
+// Unique id for each toast. Date.now() alone collides when two toasts are
+// dispatched within the same millisecond, which produces duplicate React keys.
+let toastSeq = 0;
+const nextToastId = () => `${Date.now()}-${toastSeq++}`;
+
 export default function Header({ onMenuClick }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -230,7 +235,7 @@ export default function Header({ onMenuClick }) {
       // Only show toasts for important actions if not the current user
       if (data.userId !== user.id) {
         setToasts(prev => [...prev, {
-          id: Date.now(),
+          id: nextToastId(),
           type: 'audit',
           message: {
             title: 'System Activity',
@@ -271,7 +276,7 @@ export default function Header({ onMenuClick }) {
     const onToast = (e) => {
       if (e.detail) {
         setToasts(prev => [...prev, {
-          id: Date.now(),
+          id: nextToastId(),
           type: e.detail.type || 'info',
           message: {
             title: e.detail.title || 'Notification',
@@ -480,11 +485,12 @@ export default function Header({ onMenuClick }) {
           <LogOut className="w-5 h-5" />
         </Button>
       </div>
-      {toasts.map((toast) => (
+      {toasts.map((toast, index) => (
         <Toast
           key={toast.id}
           type={toast.type}
           message={toast.message}
+          index={index}
           onClose={() => removeToast(toast.id)}
         />
       ))}
