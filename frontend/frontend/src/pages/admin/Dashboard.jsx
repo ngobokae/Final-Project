@@ -14,6 +14,7 @@ import {
 } from 'recharts';
 import { apiGet, apiDelete, API_BASE_URL } from '../../utils/api';
 import { useNavigate } from 'react-router-dom';
+import { useConfirmDialog } from '../../contexts/ConfirmDialogContext';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { StatCard } from '../../components/ui/StatCard';
 import { SkeletonStatCard, SkeletonCard, Skeleton } from '../../components/ui/skeleton';
@@ -44,8 +45,12 @@ function ServiceDot({ ok, label }) {
   );
 }
 
+const toast = (type, title, description) =>
+  window.dispatchEvent(new CustomEvent('app:toast', { detail: { type, title, description } }));
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { confirm } = useConfirmDialog();
   const [timeRange, setTimeRange] = useState('30d');
   const [activityFilter, setActivityFilter] = useState('all');
   const [stats, setStats] = useState({
@@ -152,9 +157,12 @@ export default function AdminDashboard() {
   };
 
   const handleRevokeSession = async (sessionId) => {
-    if (!window.confirm('Are you sure you want to revoke this user session? The user will be logged out immediately.')) {
-      return;
-    }
+    const ok = await confirm('The user will be logged out immediately. This cannot be undone.', {
+      title: 'Revoke this session?',
+      confirmText: 'Revoke session',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       setSessionsLoading(true);
       const res = await apiDelete(`/api/admin/sessions/${sessionId}`);
@@ -163,9 +171,10 @@ export default function AdminDashboard() {
         if (refreshed.success) {
           setActiveSessions(refreshed.sessions || []);
         }
+        toast('success', 'Session revoked', 'The user has been signed out.');
       }
     } catch (e) {
-      alert(e.message || 'Failed to revoke session');
+      toast('error', 'Could not revoke session', e.message || 'Please try again.');
     } finally {
       setSessionsLoading(false);
     }
@@ -256,8 +265,9 @@ export default function AdminDashboard() {
       a.download = `kinglion-db-backup-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
+      toast('success', 'Export ready', 'Database backup has been downloaded.');
     } catch (e) {
-      alert(e.message || 'Failed to export database');
+      toast('error', 'Export failed', e.message || 'Could not export database.');
     }
   };
 
@@ -417,7 +427,12 @@ export default function AdminDashboard() {
                     role="button"
                     tabIndex={0}
                     onClick={() => navigate(`/admin/users?highlight=${u.id}`)}
-                    onKeyDown={(e) => e.key === 'Enter' && navigate(`/admin/users?highlight=${u.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        navigate(`/admin/users?highlight=${u.id}`);
+                      }
+                    }}
                     className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-800 cursor-pointer text-sm"
                   >
                     <div>
@@ -612,6 +627,12 @@ export default function AdminDashboard() {
                     role="button"
                     tabIndex={0}
                     onClick={() => navigate('/admin/audit-logs')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        navigate('/admin/audit-logs');
+                      }
+                    }}
                     className="flex gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-800 cursor-pointer mb-2"
                   >
                     <Icon className={`w-4 h-4 mt-1 ${alert.color === 'amber' ? 'text-amber-600' : 'text-green-600'}`} />
@@ -670,6 +691,12 @@ export default function AdminDashboard() {
                   role="button"
                   tabIndex={0}
                   onClick={() => navigate('/admin/audit-logs')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      navigate('/admin/audit-logs');
+                    }
+                  }}
                   className="flex items-start gap-4 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-neutral-800 cursor-pointer"
                 >
                   <div className={`w-2 h-2 rounded-full mt-2 ${

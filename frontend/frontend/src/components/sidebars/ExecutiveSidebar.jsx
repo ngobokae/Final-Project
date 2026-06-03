@@ -45,9 +45,14 @@ export default function ExecutiveSidebar({ open = false, onClose }) {
       const insights = Array.isArray(insightsRes) ? insightsRes : (insightsRes?.insights || []);
       
       await generateBusinessReport(user, stats, insights);
+      window.dispatchEvent(new CustomEvent('app:toast', {
+        detail: { type: 'success', title: 'Report ready', description: 'Your PDF business report has been downloaded.' }
+      }));
     } catch (error) {
       console.error('Report error:', error);
-      alert(`Could not generate report: ${error.message || 'Unknown error'}`);
+      window.dispatchEvent(new CustomEvent('app:toast', {
+        detail: { type: 'error', title: 'Report failed', description: error.message || 'Could not generate report.' }
+      }));
     } finally {
       setIsGenerating(false);
     }

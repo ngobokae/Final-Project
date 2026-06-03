@@ -32,23 +32,14 @@ export default function Login() {
   const { login, verify2FA } = useAuth();
   const navigate = useNavigate();
 
-  // Force light mode on login/OTP pages - remove dark class immediately
+  // The login screen is designed for a light surface, so render it in light
+  // mode regardless of the visitor's stored theme, then restore their theme
+  // when they navigate away.
   useEffect(() => {
     const root = document.documentElement;
-    // Remove dark class immediately
     root.classList.remove('dark');
-    
-    // Also ensure it stays removed (in case something tries to add it)
-    const observer = new MutationObserver(() => {
-      if (root.classList.contains('dark')) {
-        root.classList.remove('dark');
-      }
-    });
-    observer.observe(root, { attributes: true, attributeFilter: ['class'] });
-    
-    // Cleanup: restore theme when leaving login page
+
     return () => {
-      observer.disconnect();
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
         try {
@@ -56,7 +47,7 @@ export default function Login() {
           if (user.theme === 'dark') {
             root.classList.add('dark');
           }
-        } catch (e) {
+        } catch {
           // Ignore parse errors
         }
       }
