@@ -40,7 +40,7 @@ export default function DashboardShell({ Sidebar }) {
   }, [mobileOpen]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-white to-red-50 dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950">
+    <div className="min-h-screen bg-background dark:bg-neutral-950">
       {/* Mobile backdrop */}
       <div
         onClick={() => setMobileOpen(false)}

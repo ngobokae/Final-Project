@@ -337,7 +337,7 @@ export default function AdminDashboard() {
         }
       />
 
-      <div className="flex flex-wrap gap-3 p-4 rounded-xl bg-gradient-to-r from-gray-50 to-red-50/40 dark:from-neutral-900 dark:to-neutral-800 border border-gray-200 dark:border-neutral-700">
+      <div className="flex flex-wrap gap-3 p-4 rounded-xl bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 shadow-sm">
         <span className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 self-center mr-2">Services</span>
         <ServiceDot ok={services.database} label="Database" />
         <ServiceDot ok={services.api} label="API Server" />

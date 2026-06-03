@@ -8,7 +8,8 @@
   --color-input: hsl(214.3 31.8% 91.4%);
   /* Focus ring follows the KINGLION brand red */
   --color-ring: hsl(0 72% 45%);
-  --color-background: hsl(0 0% 100%);
+  /* Soft neutral canvas (not pure white) to cut glare; white cards lift off it */
+  --color-background: hsl(220 16% 96%);
   --color-foreground: hsl(222.2 84% 4.9%);
 
   /* Brand: KINGLION red */
