@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -10,7 +10,7 @@ import {
   TrendingUp, TrendingDown, Brain, Target, AlertTriangle, 
   Download, RefreshCcw, Filter, Search, BarChart3, ArrowUpRight,
   ArrowDownRight, Calendar, Zap, Activity, LineChart as LineChartIcon,
-  Trash2
+  Trash2, Upload, CheckCircle, AlertCircle, Loader
 } from 'lucide-react';
 import { 
   LineChart, Line, BarChart, Bar, AreaChart, Area, 
@@ -18,6 +18,7 @@ import {
   ResponsiveContainer, ComposedChart
 } from 'recharts';
 import { apiGet, apiPost, apiDelete } from '../../utils/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 import { DEMAND_MODELS as DEFAULT_DEMAND_MODELS } from '../../utils/models';
 import { darkBlueChartTheme, AreaGradient, axisProps, gridProps, tooltipProps } from '../../utils/chartStyles';
 import { useConfirmDialog } from '../../contexts/ConfirmDialogContext';
@@ -34,6 +35,13 @@ export default function DemandForecast() {
   const [demandModels, setDemandModels] = useState([]);
   const [lastInsights, setLastInsights] = useState(null);
   const [forecastAccuracy, setForecastAccuracy] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStage, setUploadStage] = useState('');
+  const [uploadError, setUploadError] = useState(null);
+  const [uploadedFileInfo, setUploadedFileInfo] = useState(null);
+  const [clearing, setClearing] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     fetchDemandModels();
@@ -168,6 +176,130 @@ export default function DemandForecast() {
     }
   };
 
+  const handleFileUpload = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    const ext = file.name.toLowerCase().split('.').pop();
+    
+    if (!['csv', 'xlsx', 'xls'].includes(ext)) {
+      setUploadError('Please upload a CSV or Excel file (.xlsx, .xls, .csv)');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      setUploadError('File size must be less than 10MB');
+      return;
+    }
+
+    try {
+      setUploading(true);
+      setUploadError(null);
+      setUploadProgress(0);
+      setUploadStage('Uploading file...');
+      setUploadedFileInfo(null);
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Simulated progress up to 90% during upload
+      const progressInterval = setInterval(() => {
+        setUploadProgress(p => Math.min(p + 10, 85));
+      }, 200);
+
+      const response = await fetch(`${API_BASE_URL}/api/forecast/upload-data`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formData
+      });
+
+      clearInterval(progressInterval);
+      setUploadProgress(90);
+      setUploadStage('Processing ML forecasts...');
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
+
+      const result = await response.json();
+      setUploadProgress(100);
+      setUploadStage('');
+      
+      // Store with filename for display
+      const uploadInfo = {
+        ...result,
+        fileName: file.name
+      };
+      setUploadedFileInfo(uploadInfo);
+      
+      // Refresh forecasts
+      window.dispatchEvent(new CustomEvent('app:forecasts-updated'));
+      window.dispatchEvent(new CustomEvent('app:operations-data-updated'));
+      
+      await fetchForecasts();
+      await fetchDashboardMetrics();
+
+      // Reset form
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+
+      // Clear success message after 10 seconds
+      setTimeout(() => {
+        setUploadedFileInfo(null);
+        setUploadProgress(0);
+      }, 10000);
+    } catch (error) {
+      console.error('File upload error:', error);
+      setUploadError(error.message || 'Failed to upload file');
+      setUploadProgress(0);
+      setUploadStage('');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleClearForecasts = async () => {
+    const confirmed = await confirm(
+      'Clear All System Data?',
+      'This will delete ALL operational data including: forecasts, production plans, procurement orders, sales, inventory, and insights. This prepares the system for a fresh prediction start. You will then upload a new file to generate fresh predictions.'
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      setClearing(true);
+      setUploadError(null);
+      const response = await fetch(`${API_BASE_URL}/api/forecast/clear`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to clear data');
+      }
+
+      setUploadedFileInfo(null);
+      setUploadProgress(0);
+      setUploadStage('');
+      setUploadError(null);
+      await fetchForecasts();
+      await fetchDashboardMetrics();
+    } catch (error) {
+      console.error('Clear data error:', error);
+      setUploadError('Failed to clear data');
+    } finally {
+      setClearing(false);
+    }
+  };
+
   const forecastData = forecasts
     .slice()
     .sort((a, b) => new Date(a.forecast_date) - new Date(b.forecast_date))
@@ -288,6 +420,112 @@ export default function DemandForecast() {
           </Button>
         </div>
       </div>
+
+      {/* File Upload Section */}
+      <Card className="border-emerald-200 bg-emerald-50">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Upload className="w-5 h-5 text-emerald-600" />
+              <div>
+                <CardTitle>Upload Forecast Data</CardTitle>
+                <CardDescription>Import CSV or Excel files with historical inventory data to generate AI predictions</CardDescription>
+              </div>
+            </div>
+            <Button 
+              onClick={handleClearForecasts}
+              variant="outline"
+              size="sm"
+              disabled={clearing}
+              className="border-red-300 text-red-600 hover:bg-red-50"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              {clearing ? 'Clearing...' : 'Clear All System Data'}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Upload Area */}
+            <div
+              className="border-2 border-dashed border-emerald-300 rounded-lg p-8 text-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-100 transition"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                onChange={handleFileUpload}
+                disabled={uploading}
+                className="hidden"
+              />
+              <div className="flex flex-col items-center gap-2">
+                <Upload className="w-8 h-8 text-emerald-600" />
+                <p className="font-medium text-gray-700">
+                  {uploading ? 'Uploading...' : 'Click to upload or drag and drop'}
+                </p>
+                <p className="text-sm text-gray-500">CSV or Excel files (.csv, .xlsx, .xls)</p>
+                <p className="text-xs text-gray-400">Maximum file size: 10MB</p>
+              </div>
+            </div>
+
+            {/* Upload Progress */}
+            {uploading && uploadProgress > 0 && (
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-600 font-medium">{uploadStage || 'Processing...'}</span>
+                  <span className="font-medium text-emerald-600">{uploadProgress}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-emerald-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Error Message */}
+            {uploadError && (
+              <div className="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-red-900">Upload Error</p>
+                  <p className="text-sm text-red-700">{uploadError}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Success Message */}
+            {uploadedFileInfo && (
+              <div className="flex items-start gap-3 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-medium text-green-900">✓ Upload Successful!</p>
+                  <p className="text-sm text-green-700 mt-2">
+                    <strong>File:</strong> {uploadedFileInfo.fileName}
+                  </p>
+                  <p className="text-sm text-green-700">
+                    <strong>Forecasts:</strong> {uploadedFileInfo.forecastsGenerated} generated from {uploadedFileInfo.fileInfo?.rowCount} rows
+                  </p>
+                  <p className="text-xs text-green-600 mt-2">To upload a new file for predictions, click "Clear All System Data" button above first</p>
+                </div>
+              </div>
+            )}
+
+            {/* File Format Guide */}
+            <div className="bg-white p-4 rounded-lg text-sm text-gray-600">
+              <p className="font-medium text-gray-900 mb-2">File Format Requirements:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Column 1: Product ID, SKU, or Name (identifier)</li>
+                <li>Column 2: Quantity or Units</li>
+                <li>Optional: Date, Region, Category</li>
+                <li>First row should contain headers</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

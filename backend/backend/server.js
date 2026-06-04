@@ -89,6 +89,8 @@ const routes = {
   'DELETE /api/forecast': { handler: forecastRoutes.handleDeleteForecasts, auth: true, roles: ['admin', 'operations', 'executive', 'operations_manager'], permission: { resource: 'forecasts', action: 'delete' } },
   'GET /api/forecast/recommendations': { handler: forecastRoutes.handleGetInventoryRecommendations, auth: true, permission: { resource: 'forecasts', action: 'view' } },
   'POST /api/forecast/recommendations': { handler: forecastRoutes.handleGenerateRecommendations, auth: true, roles: ['admin', 'inventory', 'executive', 'operations_manager'], permission: { resource: 'forecasts', action: 'create' } },
+  'POST /api/forecast/upload-data': { handler: forecastRoutes.handleUploadForecastData, auth: true, roles: ['admin', 'operations', 'operations_manager'], permission: { resource: 'forecasts', action: 'create' } },
+  'POST /api/forecast/clear': { handler: forecastRoutes.handleClearForecasts, auth: true, roles: ['admin', 'operations', 'operations_manager'], permission: { resource: 'forecasts', action: 'delete' } },
 
   // Demand models (shared)
   'GET /api/demand-models': { handler: demandModelsRoutes.handleGetDemandModels, auth: true, permission: { resource: 'forecasts', action: 'view' } },

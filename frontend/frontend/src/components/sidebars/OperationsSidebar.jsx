@@ -41,12 +41,21 @@ export default function OperationsSidebar() {
     };
 
     loadCounts();
-    window.addEventListener('app:operations-data-updated', loadCounts);
-    window.addEventListener('app:notifications-changed', loadCounts);
+    
+    // Listen for data updates and clear events
+    const handleDataUpdate = () => {
+      if (mounted) loadCounts();
+    };
+    
+    window.addEventListener('app:operations-data-updated', handleDataUpdate);
+    window.addEventListener('app:notifications-changed', handleDataUpdate);
+    window.addEventListener('app:forecasts-updated', handleDataUpdate);
+    
     return () => {
       mounted = false;
-      window.removeEventListener('app:operations-data-updated', loadCounts);
-      window.removeEventListener('app:notifications-changed', loadCounts);
+      window.removeEventListener('app:operations-data-updated', handleDataUpdate);
+      window.removeEventListener('app:notifications-changed', handleDataUpdate);
+      window.removeEventListener('app:forecasts-updated', handleDataUpdate);
     };
   }, []);
 

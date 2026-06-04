@@ -35,10 +35,12 @@ export default function InventorySidebar() {
     loadCounts();
     window.addEventListener('app:operations-data-updated', loadCounts);
     window.addEventListener('app:notifications-changed', loadCounts);
+    window.addEventListener('app:forecasts-updated', loadCounts);
     return () => {
       mounted = false;
       window.removeEventListener('app:operations-data-updated', loadCounts);
       window.removeEventListener('app:notifications-changed', loadCounts);
+      window.removeEventListener('app:forecasts-updated', loadCounts);
     };
   }, []);
 

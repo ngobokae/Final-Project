@@ -28,10 +28,12 @@ export default function ExecutiveSidebar() {
     loadInsightsCount();
     window.addEventListener('app:operations-data-updated', loadInsightsCount);
     window.addEventListener('app:notifications-changed', loadInsightsCount);
+    window.addEventListener('app:forecasts-updated', loadInsightsCount);
     return () => {
       mounted = false;
       window.removeEventListener('app:operations-data-updated', loadInsightsCount);
       window.removeEventListener('app:notifications-changed', loadInsightsCount);
+      window.removeEventListener('app:forecasts-updated', loadInsightsCount);
     };
   }, []);
 

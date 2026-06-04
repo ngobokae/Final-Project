@@ -52,7 +52,9 @@ export default function Header() {
 
   const handleLogout = () => {
     logout();
-    window.location.replace('/');
+    setTimeout(() => {
+      navigate('/', { replace: true });
+    }, 0);
   };
 
   const formatRelativeTime = (d) => {
