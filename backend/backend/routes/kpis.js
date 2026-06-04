@@ -493,3 +493,16 @@ export const handleCreateKPI = async (req, res) => {
     sendError(res, 500, 'Failed to create KPI');
   }
 };
+
+/** POST /api/kpis/recalculate — refresh KPI snapshot after bulk forecasts */
+export const handleRecalculateKPIs = async (req, res) => {
+  try {
+    const body = await parseBody(req);
+    const days = Math.min(730, Math.max(7, parseInt(body?.days, 10) || 30));
+    await recalculateAndPersistKPIs(days);
+    sendSuccess(res, { success: true, message: 'KPIs recalculated', days });
+  } catch (error) {
+    console.error('Recalculate KPIs error:', error);
+    sendError(res, 500, 'Failed to recalculate KPIs');
+  }
+};

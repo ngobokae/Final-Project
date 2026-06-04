@@ -3,6 +3,14 @@
 
 export const DEMAND_MODELS = [
   {
+    id: 'baseline',
+    name: 'Fast baseline',
+    type: 'Statistical',
+    description: 'Quick moving-average forecast. Best for bulk Predict 2 runs.',
+    accuracy: 82.0,
+    active: true,
+  },
+  {
     id: 'ensemble',
     name: 'Ensemble (Best)',
     type: 'Hybrid',

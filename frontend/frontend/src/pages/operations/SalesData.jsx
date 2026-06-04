@@ -27,15 +27,15 @@ export default function SalesData() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRegion, setFilterRegion] = useState('all');
   const [filterProduct, setFilterProduct] = useState('all');
-  const [dateRange, setDateRange] = useState('30d');
+  const [dateRange, setDateRange] = useState('1y');
   const [products, setProducts] = useState([]);
   const [stats, setStats] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
-  const [canPredict, setCanPredict] = useState(false);
   const [predicting, setPredicting] = useState(false);
+  const [predictProgress, setPredictProgress] = useState({ current: 0, total: 0 });
   const [demandModels, setDemandModels] = useState([]);
-  const [selectedModelId, setSelectedModelId] = useState('ensemble');
+  const [selectedModelId, setSelectedModelId] = useState('baseline');
   const [uploadedFiles, setUploadedFiles] = useState(() => {
     try {
       const saved = localStorage.getItem('sales_uploaded_files');
@@ -61,6 +61,11 @@ export default function SalesData() {
       localStorage.setItem('sales_uploaded_files', JSON.stringify(uploadedFiles));
     } catch (_) {}
   }, [uploadedFiles]);
+
+  // Only keep uploads that actually imported rows (so predict stays tied to real documents)
+  useEffect(() => {
+    setUploadedFiles((prev) => prev.filter((f) => Number(f.records) > 0));
+  }, []);
 
   useEffect(() => {
     fetchDemandModels();
@@ -256,27 +261,39 @@ export default function SalesData() {
 
       if (response.ok && data.success) {
         const processed = data.recordsProcessed || 0;
-        const newEntries = Array.from(files).map((file) => ({
-          name: file.name,
-          size: file.size,
-          uploadedAt: new Date().toISOString(),
-          records: processed,
-        }));
-        setUploadedFiles((prev) => [...newEntries, ...prev]);
-        setCanPredict(processed > 0);
         setActiveTab('upload');
+        if (processed > 0) {
+          const newEntries = Array.from(files).map((file) => ({
+            name: file.name,
+            size: file.size,
+            uploadedAt: new Date().toISOString(),
+            records: processed,
+          }));
+          setUploadedFiles((prev) => [...newEntries, ...prev]);
+        }
         setDateRange('1y');
         if (Array.isArray(data.sales)) setSales(data.sales);
         if (data.stats != null) setStats(data.stats);
         await fetchSalesData('1y', true);
-        window.dispatchEvent(new CustomEvent('app:toast', { 
-          detail: { 
-            type: 'success', 
-            title: 'Upload Successful', 
-            description: data.message || `Processed ${processed} records successfully.` 
-          } 
-        }));
-        setTimeout(() => predictSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+        if (processed > 0) {
+          window.dispatchEvent(new CustomEvent('app:toast', { 
+            detail: { 
+              type: 'success', 
+              title: 'Upload Successful', 
+              description: data.message || `Processed ${processed} records successfully.` 
+            } 
+          }));
+          setTimeout(() => predictSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+        } else {
+          const debugCols = data.debug?.columns?.join(', ') || '';
+          window.dispatchEvent(new CustomEvent('app:toast', { 
+            detail: { 
+              type: 'warning', 
+              title: 'No rows imported', 
+              description: data.message || `File read but 0 sales saved.${debugCols ? ` Columns: ${debugCols}` : ''} Use product SKU/name, date, quantity, and unit_price.` 
+            } 
+          }));
+        }
       } else {
         const errMsg = data.error || data.message || `Upload failed (${response.status}). Please check your file and try again.`;
         window.dispatchEvent(new CustomEvent('app:toast', { 
@@ -324,6 +341,27 @@ export default function SalesData() {
     setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleDeleteAllSalesData = async () => {
+    const ok = await confirm('Delete ALL sales data and related records (forecasts, recommendations, production plans)? This cannot be undone.', {
+      title: 'Delete All Sales Data',
+      confirmText: 'Delete All',
+      variant: 'danger',
+    });
+    if (!ok) {
+      return;
+    }
+    try {
+      await apiDelete('/api/sales?scope=all');
+      setUploadedFiles([]);
+      await fetchSalesData(null, false);
+      window.dispatchEvent(new CustomEvent('app:forecasts-updated'));
+      window.dispatchEvent(new CustomEvent('app:operations-data-updated'));
+    } catch (err) {
+      console.error('Delete all sales failed', err);
+      alert(err?.message || 'Failed to delete sales data.');
+    }
+  };
+
   const handleClearUploadHistory = () => {
     confirm('Clear the list of uploaded documents? This does NOT delete sales data from the database.', {
       title: 'Clear Upload History',
@@ -336,88 +374,113 @@ export default function SalesData() {
   };
 
   const handleRunPredictions = async () => {
+    const MAX_BULK_PRODUCTS = 12;
     try {
       setPredicting(true);
+      setPredictProgress({ current: 0, total: 0 });
 
       const availableModels = demandModels.length ? demandModels : DEFAULT_DEMAND_MODELS;
-      const mustChoose = availableModels.length > 1;
-      const finalModelId = selectedModelId || availableModels[0]?.id || 'ensemble';
-
-      if (mustChoose && !selectedModelId) {
-        alert('Please choose an AI model before running predictions.');
-        return;
-      }
-
+      const finalModelId = selectedModelId || availableModels[0]?.id || 'baseline';
       const modelName = availableModels.find((m) => m.id === finalModelId)?.name || finalModelId;
 
-      const salesList = sales || [];
-      let uniqueProductIds = Array.from(new Set(salesList.map((s) => s.product_id).filter(Boolean)));
-
-      if (uniqueProductIds.length === 0) {
+      let uniqueProductIds = [];
+      if (filterProduct !== 'all') {
+        uniqueProductIds = [Number(filterProduct)];
+      } else {
         const fallback = await apiGet('/api/sales/product-ids').catch(() => ({}));
-        uniqueProductIds = fallback.productIds || [];
+        uniqueProductIds = (fallback.productIds || []).map(Number).filter(Boolean);
+        if (uniqueProductIds.length === 0) {
+          const salesList = sales || [];
+          uniqueProductIds = Array.from(new Set(salesList.map((s) => s.product_id).filter(Boolean)));
+        }
       }
 
       if (uniqueProductIds.length === 0) {
-        alert('No products found in sales data to run predictions. Upload sales data first and ensure it has product information (product name, SKU, or product_id).');
+        alert('No products with sales history found. Upload sales data first (CSV needs product + quantity + date).');
         return;
+      }
+
+      if (uniqueProductIds.length > MAX_BULK_PRODUCTS && filterProduct === 'all') {
+        const ok = await confirm(
+          `Predict for the first ${MAX_BULK_PRODUCTS} of ${uniqueProductIds.length} products? (Faster than all at once.) Use the product filter to run one product only.`,
+          { title: 'Limit prediction batch', confirmText: `Run ${MAX_BULK_PRODUCTS}`, cancelText: 'Cancel' }
+        );
+        if (!ok) return;
+        uniqueProductIds = uniqueProductIds.slice(0, MAX_BULK_PRODUCTS);
       }
 
       const baseDaysAhead =
-        dateRange === '30d' ? 30 : dateRange === '90d' ? 90 : dateRange === '7d' ? 7 : 365;
-      // Keep forecast horizon within current calendar year to avoid confusing "next year" rows.
+        dateRange === '30d' ? 30 : dateRange === '90d' ? 90 : dateRange === '7d' ? 7 : 90;
       const now = new Date();
       const endOfYear = new Date(now.getFullYear(), 11, 31);
       const daysUntilYearEnd = Math.max(1, Math.ceil((endOfYear - now) / (24 * 60 * 60 * 1000)));
-      const daysAhead = Math.min(baseDaysAhead, daysUntilYearEnd);
+      const daysAhead = Math.min(baseDaysAhead, daysUntilYearEnd, 90);
+
+      const total = uniqueProductIds.length;
+      setPredictProgress({ current: 0, total });
 
       let generated = 0;
       let skipped = 0;
+      let lastError = null;
 
-      for (const productId of uniqueProductIds) {
+      for (let i = 0; i < uniqueProductIds.length; i++) {
+        const productId = uniqueProductIds[i];
+        setPredictProgress({ current: i + 1, total });
         try {
           await apiPost('/api/forecast/generate', {
             product_id: productId,
             days_ahead: daysAhead,
             model_type: finalModelId,
+            bulk_mode: true,
           });
           generated++;
         } catch (err) {
+          const msg = err?.message || '';
           const isInsufficient =
-            (err?.message || '').includes('Insufficient historical data') ||
-            (err?.message || '').includes('data points') ||
-            (err?.message || '').includes('No historical sales');
+            msg.includes('Insufficient historical data') ||
+            msg.includes('data points') ||
+            msg.includes('No historical sales') ||
+            msg.includes('No historical sales data');
           if (isInsufficient) {
             skipped++;
           } else {
-            throw err;
+            lastError = err;
+            console.warn('Forecast failed for product', productId, err);
+            skipped++;
           }
         }
       }
 
       if (generated > 0) {
+        try {
+          await apiPost('/api/kpis/recalculate', { days: 90 }).catch(() => {});
+        } catch (_) {}
         window.dispatchEvent(new CustomEvent('app:forecasts-updated'));
         await fetchSalesData(dateRange, true);
+        setActiveTab('overview');
         const description = skipped > 0
-          ? `Forecasts generated for ${generated} product(s) using "${modelName}". ${skipped} product(s) skipped (need at least 1 sales record each).`
-          : `Forecasts generated successfully for ${generated} product(s) using "${modelName}".`;
-        
-        window.dispatchEvent(new CustomEvent('app:toast', { 
-          detail: { type: 'success', title: 'AI Predictions Ready', description } 
+          ? `Forecasts for ${generated} product(s) (${modelName}). ${skipped} skipped. See Overview → Sales Trends and Forecasted (30D).`
+          : `Forecasts for ${generated} product(s) using ${modelName}. Open the Overview tab to see charts.`;
+        window.dispatchEvent(new CustomEvent('app:toast', {
+          detail: { type: 'success', title: 'Predictions complete', description },
         }));
       } else {
-        window.dispatchEvent(new CustomEvent('app:toast', { 
-          detail: { type: 'warning', title: 'No Forecasts Generated', description: 'Each product needs at least 1 historical sales record to run AI predictions.' } 
+        const description = lastError?.message
+          ? `No forecasts saved. ${lastError.message}`
+          : 'Each product needs at least one sales row in the database. Try Fast baseline model and upload again.';
+        window.dispatchEvent(new CustomEvent('app:toast', {
+          detail: { type: 'warning', title: 'No forecasts generated', description },
         }));
       }
     } catch (error) {
       console.error('Prediction error:', error);
-      let msg = error?.message || 'Failed to generate forecasts. Please try again.';
-      window.dispatchEvent(new CustomEvent('app:toast', { 
-        detail: { type: 'error', title: 'AI Forecast Error', description: msg } 
+      const msg = error?.message || 'Failed to generate forecasts. Please try again.';
+      window.dispatchEvent(new CustomEvent('app:toast', {
+        detail: { type: 'error', title: 'AI Forecast Error', description: msg },
       }));
     } finally {
       setPredicting(false);
+      setPredictProgress({ current: 0, total: 0 });
     }
   };
 
@@ -452,6 +515,9 @@ export default function SalesData() {
   const totalUnits = Number(stats?.totalQuantity || 0);
   const totalRecords = Number(stats?.totalRecords || 0);
   const dataQuality = totalRecords > 0 ? 98.7 : 0;
+
+  // Predict only after a successful document upload (listed above with records > 0)
+  const showPredictPanel = uploadedFiles.some((f) => Number(f.records) > 0);
 
   const productPerformanceData = (() => {
     if (!sales || !sales.length) return [];
@@ -527,9 +593,9 @@ export default function SalesData() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <BarChart3 className="w-7 h-7 text-emerald-600" />
-            Kinglion Sales Intelligence
+            Sales Data (Predict 2 – Sales)
           </h1>
-          <p className="text-gray-500 mt-1">Kinglion Rwanda Investment Ltd • {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          <p className="text-gray-500 mt-1">Predict 2 for sales (up to last 2 years of history). {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={exportToCSV}>
@@ -546,8 +612,8 @@ export default function SalesData() {
       {/* Section Title */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Operations Management</h2>
-          <p className="text-gray-500 mt-1">Manage and analyze historical sales for Iron Sheets and Motorcycles.</p>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Sales Data Management</h2>
+          <p className="text-gray-500 mt-1">Upload, manage, and analyze historical sales data.</p>
         </div>
         <div className="flex items-center gap-2">
               <Select value={dateRange} onValueChange={setDateRange}>
@@ -565,6 +631,10 @@ export default function SalesData() {
           <Button variant="outline" size="sm" onClick={() => fetchSalesData()} disabled={loading}>
             <RefreshCcw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleDeleteAllSalesData} className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30" disabled={loading}>
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete all sales data
           </Button>
         </div>
       </div>
@@ -740,13 +810,6 @@ export default function SalesData() {
                   className="hidden"
                 />
                 
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <p className="text-xs text-gray-400 mb-2">Need a template?</p>
-                  <Button variant="ghost" size="sm" onClick={() => window.open('/sales_template.csv')} className="text-emerald-600 h-7 text-xs">
-                    <Download className="w-3 h-3 mr-1" />
-                    Download Kinglion Sales Template
-                  </Button>
-                </div>
               </div>
 
               {uploadedFiles.length > 0 && (
@@ -804,8 +867,14 @@ export default function SalesData() {
                 </div>
               )}
 
-              {canPredict && (
-                <div ref={predictSectionRef} className="mt-6 space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+              {!showPredictPanel && !loading && (
+                <p className="mt-4 text-sm text-amber-700 dark:text-amber-300 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 px-3 py-2">
+                  Upload a CSV or Excel file above. After at least one row is imported, your file appears in <strong>Uploaded documents</strong> and <strong>Run Predict 2 (Sales)</strong> shows here.
+                </p>
+              )}
+
+              {showPredictPanel && (
+                <div ref={predictSectionRef} className="mt-6 space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 px-4 py-3">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="w-5 h-5 text-emerald-600" />
                     <div>
@@ -820,7 +889,7 @@ export default function SalesData() {
                     <div className="w-full md:max-w-xs">
                       <div className="text-xs font-semibold text-emerald-800 uppercase">AI Model</div>
                       <Select
-                        value={selectedModelId || (demandModels[0] || DEFAULT_DEMAND_MODELS[0])?.id || 'ensemble'}
+                        value={selectedModelId || (demandModels[0] || DEFAULT_DEMAND_MODELS[0])?.id || 'baseline'}
                         onValueChange={setSelectedModelId}
                       >
                         <SelectTrigger className="mt-1 border-emerald-200 dark:border-neutral-600 bg-white dark:bg-neutral-900">
@@ -844,7 +913,9 @@ export default function SalesData() {
                       {predicting ? (
                         <>
                           <RefreshCcw className="w-4 h-4 mr-2 animate-spin" />
-                          Predicting...
+                          {predictProgress.total > 0
+                            ? `Predicting ${predictProgress.current}/${predictProgress.total}…`
+                            : 'Starting…'}
                         </>
                       ) : (
                         <>

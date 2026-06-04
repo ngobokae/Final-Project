@@ -67,11 +67,11 @@ const routes = {
   'GET /api/sales/stats': { handler: salesRoutes.handleGetSalesStats, auth: true, permission: { resource: 'sales', action: 'view' } },
   'GET /api/sales/product-ids': { handler: salesRoutes.handleGetSalesProductIds, auth: true, permission: { resource: 'sales', action: 'view' } },
   'GET /api/sales/:id': { handler: salesRoutes.handleGetSale, auth: true, permission: { resource: 'sales', action: 'view' } },
-  'POST /api/sales': { handler: salesRoutes.handleCreateSale, auth: true, roles: ['admin', 'operations'], permission: { resource: 'sales', action: 'create' } },
+  'POST /api/sales': { handler: salesRoutes.handleCreateSale, auth: true, roles: ['admin', 'operations', 'operations_manager'], permission: { resource: 'sales', action: 'create' } },
   'PUT /api/sales/:id': { handler: salesRoutes.handleUpdateSale, auth: true, roles: ['admin', 'operations'], permission: { resource: 'sales', action: 'edit' } },
   'DELETE /api/sales': { handler: salesRoutes.handleDeleteAllSales, auth: true, roles: ['admin', 'operations'], permission: { resource: 'sales', action: 'delete' } },
   'DELETE /api/sales/:id': { handler: salesRoutes.handleDeleteSale, auth: true, roles: ['admin', 'operations'], permission: { resource: 'sales', action: 'delete' } },
-  'POST /api/sales/upload': { handler: salesRoutes.handleUploadSales, auth: true, roles: ['admin', 'operations'], permission: { resource: 'sales', action: 'create' } },
+  'POST /api/sales/upload': { handler: salesRoutes.handleUploadSales, auth: true, roles: ['admin', 'operations', 'operations_manager'], permission: { resource: 'sales', action: 'create' } },
 
   // Inventory routes
   'GET /api/inventory': { handler: inventoryRoutes.handleGetInventory, auth: true, permission: { resource: 'inventory', action: 'view' } },
@@ -141,6 +141,7 @@ const routes = {
   'GET /api/kpis/summary': { handler: kpisRoutes.handleGetKPISummary, auth: true, permission: { resource: 'reports', action: 'view' } },
   'GET /api/kpis/:id': { handler: kpisRoutes.handleGetKPI, auth: true, permission: { resource: 'reports', action: 'view' } },
   'POST /api/kpis': { handler: kpisRoutes.handleCreateKPI, auth: true, roles: ['admin', 'executive'], permission: { resource: 'reports', action: 'edit' } },
+  'POST /api/kpis/recalculate': { handler: kpisRoutes.handleRecalculateKPIs, auth: true, roles: ['admin', 'operations', 'operations_manager', 'executive'], permission: { resource: 'reports', action: 'view' } },
   'PUT /api/kpis/:id': { handler: kpisRoutes.handleUpdateKPI, auth: true, roles: ['admin', 'executive'], permission: { resource: 'reports', action: 'edit' } },
 
   // Settings routes (admin only)

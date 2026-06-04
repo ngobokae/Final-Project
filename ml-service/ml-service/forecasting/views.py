@@ -121,6 +121,8 @@ class ForecastView(APIView):
 
     def _generate_forecast(self, df, days_ahead, model_type='ensemble'):
         model_type = str(model_type or 'ensemble').lower()
+        if model_type == 'baseline':
+            return self._forecast_baseline(df, days_ahead, source='baseline')
         if model_type == 'arima':
             return self._forecast_arima(df, days_ahead)
         if model_type == 'prophet':

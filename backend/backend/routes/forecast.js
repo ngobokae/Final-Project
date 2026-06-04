@@ -34,17 +34,26 @@ const callMLService = (endpoint, method = 'GET', data = null) => {
       });
 
       res.on('end', () => {
+        let parsed = null;
         try {
-          console.log(`[Forecast Upload] ML Service response (raw): ${responseData.substring(0, 200)}`);
-          const parsed = JSON.parse(responseData);
-          if (res.statusCode >= 200 && res.statusCode < 300) {
-            resolve(parsed);
-          } else {
-            reject(new Error(parsed.error || 'ML Service error'));
-          }
+          console.log(`[ML Service] ${method} ${endpoint} → HTTP ${res.statusCode}: ${(responseData || '').substring(0, 200)}`);
+          parsed = responseData ? JSON.parse(responseData) : null;
         } catch (error) {
-          console.error(`[Forecast Upload] JSON parse error - Response: "${responseData.substring(0, 500)}"`);
-          reject(new Error('Invalid JSON response from ML service'));
+          console.error(`[ML Service] JSON parse error - Response: "${(responseData || '').substring(0, 500)}"`);
+          const snippet = (responseData || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+          const hint = snippet.includes('<!doctype html') || snippet.includes('<html')
+            ? ' (ML service returned HTML — check ALLOWED_HOSTS includes ml-service in Docker)'
+            : '';
+          return reject(
+            new Error(
+              `ML service returned non-JSON (HTTP ${res.statusCode})${hint}${snippet ? `: ${snippet}` : ''}`
+            )
+          );
+        }
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(parsed);
+        } else {
+          reject(new Error(parsed?.error || parsed?.detail || `ML service error (HTTP ${res.statusCode})`));
         }
       });
     });
@@ -272,7 +281,7 @@ export const handleDeleteForecasts = async (req, res) => {
 export const handleGenerateForecast = async (req, res) => {
   try {
     const body = await parseBody(req);
-    const { product_id, days_ahead = 30, model_type = 'ensemble' } = body;
+    const { product_id, days_ahead = 30, model_type = 'ensemble', bulk_mode = false } = body;
 
     if (!product_id) {
       return sendError(res, 400, 'product_id is required');
@@ -323,21 +332,18 @@ export const handleGenerateForecast = async (req, res) => {
 
     await logAudit(req.user.id, 'GENERATE_FORECAST', 'forecast', product_id, { days_ahead, model_type }, req);
 
-    // After forecasts are generated, automatically (re)generate an inventory recommendation
-    // for this product so procurement views always have up-to-date suggestions.
-    try {
-      await generateInventoryRecommendationForProduct(product_id, req.user.id, req);
-    } catch (recError) {
-      // Do not fail the forecast endpoint if recommendation generation fails
-      console.warn('Auto-generate inventory recommendation after forecast failed:', recError);
-    }
-
-    // Also recalculate KPIs and persist a snapshot so executive dashboards
-    // and KPI pages can read the latest metrics from the kpis table if needed.
-    try {
-      await recalculateAndPersistKPIs(30);
-    } catch (kpiError) {
-      console.warn('Recalculate KPIs after forecast generation failed:', kpiError);
+    // Skip heavy side effects during bulk "Predict 2" runs (done once at the end).
+    if (!bulk_mode) {
+      try {
+        await generateInventoryRecommendationForProduct(product_id, req.user.id, req);
+      } catch (recError) {
+        console.warn('Auto-generate inventory recommendation after forecast failed:', recError);
+      }
+      try {
+        await recalculateAndPersistKPIs(30);
+      } catch (kpiError) {
+        console.warn('Recalculate KPIs after forecast generation failed:', kpiError);
+      }
     }
 
     const savedForecasts = await query(`

@@ -130,6 +130,26 @@ export default function DemandForecast() {
     }
   };
 
+  const handleDeleteAllForecasts = async () => {
+    const ok = await confirm('Delete ALL saved predictions for all products? This cannot be undone.', {
+      title: 'Delete All Predictions',
+      confirmText: 'Delete All',
+      variant: 'danger',
+    });
+    if (!ok) {
+      return;
+    }
+    try {
+      await apiDelete('/api/forecast?scope=all');
+      setForecasts([]);
+      window.dispatchEvent(new CustomEvent('app:forecasts-updated'));
+      window.dispatchEvent(new CustomEvent('app:operations-data-updated'));
+    } catch (error) {
+      console.error('Failed to delete all forecasts:', error);
+      alert('Failed to delete all predictions. Please try again.');
+    }
+  };
+
   const handleDeleteForecastRow = async (productId, forecastDate) => {
     const ok = await confirm('Delete this prediction for the selected product and date?', {
       title: 'Delete Prediction',
@@ -765,6 +785,12 @@ export default function DemandForecast() {
                   running Predict 2 (Sales) to see new data.
                 </CardDescription>
               </div>
+              {forecasts.length > 0 && (
+                <Button variant="outline" size="sm" onClick={handleDeleteAllForecasts}>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete all
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               {forecasts.length > 0 ? (

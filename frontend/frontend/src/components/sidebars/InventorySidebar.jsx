@@ -57,6 +57,7 @@ export default function InventorySidebar() {
         { to: '/inventory/stock-overview', icon: Package, label: 'Stock Overview', badge: counts.stock > 0 ? String(counts.stock) : null },
         { to: '/inventory/stock-transactions', icon: ArrowUpDown, label: 'Logistics & Warehouse', badge: null },
         { to: '/inventory/warehouse-map', icon: Warehouse, label: 'Warehouse Map', badge: null },
+        { to: '/inventory/labels', icon: QrCode, label: 'QR Labels', badge: null },
         { to: '/inventory/optimization', icon: Zap, label: 'Optimization', badge: null },
         { to: '/inventory/alerts', icon: AlertTriangle, label: 'Alerts', badge: counts.alerts > 0 ? String(counts.alerts) : null }
       ]

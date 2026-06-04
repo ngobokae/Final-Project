@@ -80,7 +80,7 @@ export const hasPermission = async (userId, resource, action) => {
       operations_manager: {
         dashboard: ['view'],
         products: ['view'],
-        sales: ['view'],
+        sales: ['view', 'create', 'edit', 'delete'],
         inventory: ['view', 'create', 'edit'],
         forecasts: ['view', 'create', 'edit'],
         procurement: ['view', 'create', 'edit', 'approve'],

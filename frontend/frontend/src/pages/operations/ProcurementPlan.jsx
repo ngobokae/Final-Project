@@ -27,6 +27,7 @@ export default function ProcurementPlan() {
   const [supplierAnalytics, setSupplierAnalytics] = useState([]);
   const [costTrends, setCostTrends] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
+  const [autoRecommendationsChecked, setAutoRecommendationsChecked] = useState(false);
   const [generatingRecs, setGeneratingRecs] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState({});
   const [showAddModal, setShowAddModal] = useState(false);
@@ -190,6 +191,7 @@ export default function ProcurementPlan() {
 
   useEffect(() => {
     const onUpdate = () => {
+      setAutoRecommendationsChecked(false);
       fetchData();
     };
     window.addEventListener('app:forecasts-updated', onUpdate);
@@ -321,6 +323,30 @@ export default function ProcurementPlan() {
       }
 
       setRecommendations(recs);
+      if (recs.length === 0 && forecastsList.length === 0) {
+        setAutoRecommendationsChecked(false);
+      }
+
+      if (!autoRecommendationsChecked && recs.length === 0 && forecastsList.length > 0) {
+        setAutoRecommendationsChecked(true);
+        try {
+          const productIds = [...new Set(forecastsList.map((f) => f.product_id).filter(Boolean))].slice(0, 20);
+          let generated = 0;
+          for (const productId of productIds) {
+            try {
+              await apiPost('/api/forecast/recommendations', { product_id: productId });
+              generated++;
+            } catch (e) {
+              console.warn('Auto recommendation generation failed for product', productId, e);
+            }
+          }
+          if (generated > 0) {
+            window.dispatchEvent(new CustomEvent('app:forecasts-updated'));
+          }
+        } catch (e) {
+          console.warn('Auto-generate recommendations from forecasts failed', e);
+        }
+      }
     } catch (err) {
       console.error('Failed to fetch procurement data:', err);
       setError(err?.message || 'Failed to load procurement data. Check that the backend is running.');
