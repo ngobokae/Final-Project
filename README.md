@@ -30,8 +30,7 @@ docker compose up --build
 
 **Default login** (from `Manaf1.sql` seed, after first DB init):
 
-- Email: `hntaganira06@gmail.com`
-- Password: `Hab,62001`
+
 
 Other seed users: `operations@example.com`, `inventory@example.com`, `executive@example.com` (see SQL dump for password hashes).
 
