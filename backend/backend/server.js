@@ -82,6 +82,8 @@ const routes = {
   'GET /api/inventory/transactions': { handler: inventoryRoutes.handleGetInventoryTransactions, auth: true, roles: ['admin', 'inventory', 'operations', 'inventory_manager'], permission: { resource: 'inventory', action: 'view' } },
   'POST /api/inventory/transactions': { handler: inventoryRoutes.handleCreateInventoryTransaction, auth: true, roles: ['admin', 'inventory', 'operations', 'inventory_manager'], permission: { resource: 'inventory', action: 'edit' } },
   'PUT /api/inventory/:id': { handler: inventoryRoutes.handleUpdateInventory, auth: true, roles: ['admin', 'inventory', 'inventory_manager'], permission: { resource: 'inventory', action: 'edit' } },
+  'GET /api/inventory/pending-receivables': { handler: inventoryRoutes.handleGetPendingProcurementReceivables, auth: true, roles: ['admin', 'inventory', 'inventory_manager', 'operations', 'operations_manager'], permission: { resource: 'inventory', action: 'view' } },
+  'POST /api/inventory/receive-procurement': { handler: inventoryRoutes.handleReceiveProcurementGoods, auth: true, roles: ['admin', 'inventory', 'inventory_manager', 'operations', 'operations_manager'], permission: { resource: 'inventory', action: 'edit' } },
 
   // Forecast routes
   'GET /api/forecast': { handler: forecastRoutes.handleGetForecasts, auth: true, permission: { resource: 'forecasts', action: 'view' } },
@@ -133,7 +135,7 @@ const routes = {
   'GET /api/procurement/recommendations': { handler: dashboardRoutes.handleGetProcurementRecommendations, auth: true },
   'GET /api/procurement/:id': { handler: procurementRoutes.handleGetProcurementOrder, auth: true },
   'POST /api/procurement': { handler: procurementRoutes.handleCreateProcurementOrder, auth: true, roles: ['admin', 'operations', 'inventory', 'inventory_manager', 'operations_manager'] },
-  'PUT /api/procurement/:id': { handler: procurementRoutes.handleUpdateProcurementOrder, auth: true, roles: ['admin', 'operations', 'operations_manager'] },
+  'PUT /api/procurement/:id': { handler: procurementRoutes.handleUpdateProcurementOrder, auth: true, roles: ['admin', 'operations', 'operations_manager', 'executive'] },
   'DELETE /api/procurement/:id': { handler: procurementRoutes.handleDeleteProcurementOrder, auth: true, roles: ['admin', 'operations', 'operations_manager'] },
 
   // KPI routes

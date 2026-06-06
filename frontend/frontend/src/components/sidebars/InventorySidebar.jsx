@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { BarChart3, Package, ArrowUpDown, Zap, AlertTriangle, FileText, ChevronRight, User, MessageSquare, Warehouse, QrCode } from 'lucide-react';
+import { BarChart3, Package, ArrowUpDown, Zap, AlertTriangle, FileText, ChevronRight, User, MessageSquare, Warehouse, QrCode, Truck } from 'lucide-react';
 import logoSrc from '../../assets/IMG_1472.PNG';
 import { apiGet } from '../../utils/api';
 
@@ -56,6 +56,7 @@ export default function InventorySidebar() {
       items: [
         { to: '/inventory/stock-overview', icon: Package, label: 'Stock Overview', badge: counts.stock > 0 ? String(counts.stock) : null },
         { to: '/inventory/stock-transactions', icon: ArrowUpDown, label: 'Logistics & Warehouse', badge: null },
+        { to: '/inventory/pending-receivables', icon: Truck, label: 'Pending Receivables', badge: null },
         { to: '/inventory/warehouse-map', icon: Warehouse, label: 'Warehouse Map', badge: null },
         { to: '/inventory/labels', icon: QrCode, label: 'QR Labels', badge: null },
         { to: '/inventory/optimization', icon: Zap, label: 'Optimization', badge: null },

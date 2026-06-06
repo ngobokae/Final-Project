@@ -1058,3 +1058,129 @@ export const handleResolveAlert = async (req, res) => {
     sendError(res, 500, 'Failed to resolve alert');
   }
 };
+
+// Receive procurement goods as stock_in in inventory
+export const handleReceiveProcurementGoods = async (req, res) => {
+  try {
+    const body = await parseBody(req);
+    const procurementOrderId = Number(body.procurement_order_id);
+    const autoConfirm = body.auto_confirm === true;
+
+    if (isNaN(procurementOrderId) || procurementOrderId <= 0) {
+      return sendError(res, 400, 'Invalid procurement order ID');
+    }
+
+    // Get procurement order details
+    const procurementRows = await query(
+      `SELECT po.*, p.sku, p.name as product_name, i.current_stock
+       FROM procurement_orders po
+       JOIN products p ON po.product_id = p.id
+       LEFT JOIN inventory i ON i.product_id = p.id
+       WHERE po.id = ?`,
+      [procurementOrderId]
+    );
+
+    if (!procurementRows.length) {
+      return sendError(res, 404, 'Procurement order not found');
+    }
+
+    const order = procurementRows[0];
+    const productId = order.product_id;
+    const quantity = Number(order.quantity || 0);
+    const previousStock = Number(order.current_stock || 0);
+    const newStock = previousStock + quantity;
+
+    if (quantity <= 0) {
+      return sendError(res, 400, 'Invalid quantity in procurement order');
+    }
+
+    // Update inventory stock
+    await query(
+      'UPDATE inventory SET current_stock = ? WHERE product_id = ?',
+      [newStock, productId]
+    );
+
+    // Create stock_in transaction record
+    await logAudit(
+      req.user?.id || null,
+      'INVENTORY_TXN_STOCK_IN',
+      'inventory',
+      productId,
+      {
+        product_id: productId,
+        product_name: order.product_name,
+        sku: order.sku,
+        transaction_type: 'stock_in',
+        quantity: quantity,
+        procurement_order_id: procurementOrderId,
+        supplier_name: order.supplier_name,
+        delta: quantity,
+        previous_stock: previousStock,
+        new_stock: newStock,
+        notes: `Stock received from procurement order #${procurementOrderId} (Supplier: ${order.supplier_name})`
+      },
+      req
+    );
+
+    // Resolve any reorder/shortage alerts for this product
+    await query(
+      `UPDATE alerts
+       SET is_resolved = TRUE, resolved_at = NOW(), resolved_by = ?
+       WHERE product_id = ?
+       AND is_resolved = FALSE
+       AND alert_type IN ('shortage', 'reorder', 'forecast_anomaly')`,
+      [req.user?.id || null, productId]
+    ).catch(() => {});
+
+    // Update procurement order status
+    if (autoConfirm) {
+      await query(
+        'UPDATE procurement_orders SET status = ? WHERE id = ?',
+        ['delivered', procurementOrderId]
+      );
+    }
+
+    sendJSON(res, 200, {
+      success: true,
+      message: `Successfully received ${quantity} units of ${order.product_name}`,
+      transaction: {
+        product_id: productId,
+        product_name: order.product_name,
+        quantity: quantity,
+        previous_stock: previousStock,
+        new_stock: newStock,
+        procurement_order_id: procurementOrderId
+      }
+    });
+  } catch (error) {
+    console.error('Receive procurement goods error:', error);
+    sendError(res, 500, `Failed to receive goods: ${error.message}`);
+  }
+};
+
+// Get pending procurement orders that can be received
+export const handleGetPendingProcurementReceivables = async (req, res) => {
+  try {
+    const orders = await query(
+      `SELECT 
+        po.*,
+        p.name as product_name,
+        p.sku,
+        p.unit_cost,
+        i.current_stock,
+        i.available_stock
+      FROM procurement_orders po
+      JOIN products p ON po.product_id = p.id
+      LEFT JOIN inventory i ON i.product_id = p.id
+      WHERE po.status IN ('approved', 'in_transit')
+      ORDER BY po.order_date DESC`
+    );
+
+    sendJSON(res, 200, {
+      pending_goods: Array.isArray(orders) ? orders : []
+    });
+  } catch (error) {
+    console.error('Get pending receivables error:', error);
+    sendError(res, 500, 'Failed to fetch pending goods');
+  }
+};

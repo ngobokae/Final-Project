@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { BarChart3, Target, Lightbulb, FileText, ChevronRight, User, MessageSquare, Calculator } from 'lucide-react';
+import { BarChart3, Target, Lightbulb, FileText, ChevronRight, User, MessageSquare, Calculator, ShoppingCart } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import logoSrc from '../../assets/IMG_1472.PNG';
 import { apiGet } from '../../utils/api';
@@ -43,6 +43,12 @@ export default function ExecutiveSidebar() {
       items: [
         { to: '/executive/dashboard', icon: BarChart3, label: 'Dashboard', badge: null },
         { to: '/executive/kpis', icon: Target, label: 'KPIs & Metrics', badge: null }
+      ]
+    },
+    {
+      title: 'Approvals',
+      items: [
+        { to: '/executive/procurement-approvals', icon: ShoppingCart, label: 'Procurement Orders', badge: null }
       ]
     },
     {

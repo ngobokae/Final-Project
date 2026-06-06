@@ -4,11 +4,13 @@ import { Button } from '../../components/ui/button';
 import { QrCode, Printer, Download, Package, CheckSquare, Square } from 'lucide-react';
 import { apiGet } from '../../utils/api';
 import { jsPDF } from 'jspdf';
+import QRCode from 'qrcode';
 
 export default function QRLabelGenerator() {
   const [inventory, setInventory] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     fetchInventory();
@@ -42,7 +44,7 @@ export default function QRLabelGenerator() {
     }
   };
 
-  const generatePDF = () => {
+  const generatePDF = async () => {
     const doc = new jsPDF();
     const itemsToPrint = inventory.filter(i => selectedItems.includes(i.product_id));
     
@@ -51,55 +53,85 @@ export default function QRLabelGenerator() {
       return;
     }
 
-    let x = 20;
-    let y = 20;
-    const boxWidth = 80;
-    const boxHeight = 50;
+    setGenerating(true);
+    try {
+      let x = 20;
+      let y = 20;
+      const boxWidth = 100;
+      const boxHeight = 60;
 
-    itemsToPrint.forEach((item, index) => {
-      // Draw label box
-      doc.setDrawColor(200, 200, 200);
-      doc.rect(x, y, boxWidth, boxHeight);
-      
-      // Add Brand
-      doc.setFontSize(10);
-      doc.setTextColor(150, 0, 0);
-      doc.text('KINGLION RWANDA', x + 5, y + 8);
-      
-      // Add Product Info
-      doc.setFontSize(12);
-      doc.setTextColor(0, 0, 0);
-      doc.text(item.product_name.substring(0, 25), x + 5, y + 18);
-      doc.setFontSize(10);
-      doc.text(`SKU: ${item.sku}`, x + 5, y + 25);
-      doc.text(`CAT: ${item.category || 'N/A'}`, x + 5, y + 32);
-      
-      // Draw a simulated QR code box
-      doc.setFillColor(0, 0, 0);
-      doc.rect(x + 55, y + 10, 20, 20);
-      doc.setFontSize(6);
-      doc.setTextColor(255, 255, 255);
-      doc.text('SCAN', x + 59, y + 21);
+      for (const item of itemsToPrint) {
+        // Generate QR code data URL with just SKU (simpler data = better scannability)
+        const qrData = await QRCode.toDataURL(item.sku, {
+          errorCorrectionLevel: 'M',
+          type: 'image/png',
+          quality: 0.92,
+          margin: 1,
+          width: 300,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+          }
+        });
 
-      // Move to next position
-      x += boxWidth + 10;
-      if (x > 120) {
-        x = 20;
-        y += boxHeight + 10;
+        // Draw label box
+        doc.setDrawColor(100, 100, 100);
+        doc.rect(x, y, boxWidth, boxHeight);
+        
+        // Add Brand
+        doc.setFontSize(9);
+        doc.setTextColor(150, 0, 0);
+        doc.text('KINGLION', x + 5, y + 7);
+        
+        // Add Product Info (left side)
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0);
+        const productName = item.product_name.substring(0, 18);
+        doc.text(productName, x + 5, y + 16);
+        
+        doc.setFontSize(7);
+        doc.text(`SKU: ${item.sku}`, x + 5, y + 22);
+        doc.text(`CAT: ${item.category || 'N/A'}`, x + 5, y + 27);
+        doc.text(`Stock: ${item.available_stock || 0}`, x + 5, y + 32);
+        
+        // Add QR Code image (right side, larger size)
+        doc.addImage(qrData, 'PNG', x + 60, y + 5, 35, 35);
+        
+        // Add barcode label
+        doc.setFontSize(6);
+        doc.text('SCAN QR', x + 70, y + 42);
+
+        // Move to next position
+        x += boxWidth + 8;
+        if (x > 110) {
+          x = 20;
+          y += boxHeight + 8;
+        }
+        
+        if (y > 230) {
+          doc.addPage();
+          x = 20;
+          y = 20;
+        }
       }
-      
-      if (y > 240 && index < itemsToPrint.length - 1) {
-        doc.addPage();
-        x = 20;
-        y = 20;
-      }
-    });
 
-    doc.save('Kinglion_Inventory_Labels.pdf');
-    
-    window.dispatchEvent(new CustomEvent('app:toast', { 
-      detail: { type: 'success', title: 'PDF Generated', description: `${itemsToPrint.length} labels are ready for printing.` } 
-    }));
+      doc.save('Kinglion_Inventory_Labels.pdf');
+      
+      window.dispatchEvent(new CustomEvent('app:toast', { 
+        detail: { 
+          type: 'success', 
+          title: 'PDF Generated', 
+          description: `${itemsToPrint.length} labels with scannable QR codes ready for printing. Make sure to print at 100% scale.` 
+        } 
+      }));
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      window.dispatchEvent(new CustomEvent('app:toast', { 
+        detail: { type: 'error', title: 'Generation Failed', description: 'Could not generate PDF with QR codes.' } 
+      }));
+    } finally {
+      setGenerating(false);
+    }
   };
 
   return (
@@ -115,11 +147,11 @@ export default function QRLabelGenerator() {
         <div className="flex gap-2">
           <Button 
             onClick={generatePDF} 
-            disabled={selectedItems.length === 0}
+            disabled={selectedItems.length === 0 || generating}
             className="bg-red-600 hover:bg-red-700"
           >
             <Printer className="w-4 h-4 mr-2" />
-            Generate PDF Labels ({selectedItems.length})
+            {generating ? 'Generating...' : `Generate PDF Labels (${selectedItems.length})`}
           </Button>
         </div>
       </div>

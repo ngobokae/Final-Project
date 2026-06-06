@@ -35,6 +35,7 @@ import Alerts from './pages/inventory/Alerts';
 import InventoryReports from './pages/inventory/Reports';
 import WarehouseMap from './pages/inventory/WarehouseMap';
 import QRLabelGenerator from './pages/inventory/QRLabelGenerator';
+import PendingReceivables from './pages/inventory/PendingReceivables';
 
 // Executive Pages
 import ExecutiveDashboard from './pages/executive/Dashboard';
@@ -43,6 +44,7 @@ import Insights from './pages/executive/Insights';
 import ExecutiveReports from './pages/executive/Reports';
 import AIHub from './pages/executive/AIHub';
 import ExecutiveSimulator from './pages/executive/Simulator';
+import ProcurementApprovals from './pages/executive/ProcurementApprovals';
 
 // Shared (all roles)
 import Profile from './pages/shared/Profile';
@@ -146,6 +148,7 @@ function AppContent() {
           <Route path="dashboard" element={<InventoryDashboard />} />
           <Route path="stock-overview" element={<StockOverview />} />
           <Route path="stock-transactions" element={<StockTransactions />} />
+          <Route path="pending-receivables" element={<PendingReceivables />} />
           <Route path="optimization" element={<Optimization />} />
           <Route path="alerts" element={<Alerts />} />
           <Route path="warehouse-map" element={<WarehouseMap />} />
@@ -168,6 +171,7 @@ function AppContent() {
           <Route path="reports" element={<ExecutiveReports />} />
           <Route path="ai-hub" element={<AIHub />} />
           <Route path="simulator" element={<ExecutiveSimulator />} />
+          <Route path="procurement-approvals" element={<ProcurementApprovals />} />
           <Route path="profile" element={<Profile />} />
           <Route path="messages" element={<Messages />} />
         </Route>

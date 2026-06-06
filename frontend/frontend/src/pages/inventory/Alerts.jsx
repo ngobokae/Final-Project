@@ -13,6 +13,7 @@ export default function Alerts() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [tab, setTab] = useState('active');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAlert, setSelectedAlert] = useState(null);
 
@@ -153,7 +154,10 @@ export default function Alerts() {
 
       {/* Alert Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4 cursor-pointer hover:shadow-md transition-shadow">
+        <div 
+          onClick={() => { setTab('active'); setFilter('all'); }}
+          className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4 cursor-pointer hover:shadow-lg hover:border-purple-400 transition-all"
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
               <Bell className="w-5 h-5 text-purple-600" />
@@ -165,7 +169,10 @@ export default function Alerts() {
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4 cursor-pointer hover:shadow-md transition-shadow">
+        <div 
+          onClick={() => { setTab('active'); setFilter('critical'); }}
+          className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4 cursor-pointer hover:shadow-lg hover:border-red-400 transition-all"
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
               <AlertTriangle className="w-5 h-5 text-red-600" />
@@ -177,7 +184,10 @@ export default function Alerts() {
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4 cursor-pointer hover:shadow-md transition-shadow">
+        <div 
+          onClick={() => { setTab('active'); setFilter('high'); }}
+          className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4 cursor-pointer hover:shadow-lg hover:border-amber-400 transition-all"
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
               <Clock className="w-5 h-5 text-amber-600" />
@@ -189,7 +199,10 @@ export default function Alerts() {
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4 cursor-pointer hover:shadow-md transition-shadow">
+        <div 
+          onClick={() => { setTab('active'); setFilter('low'); }}
+          className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4 cursor-pointer hover:shadow-lg hover:border-blue-400 transition-all"
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
               <Package className="w-5 h-5 text-blue-600" />
@@ -201,7 +214,10 @@ export default function Alerts() {
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4 cursor-pointer hover:shadow-md transition-shadow">
+        <div 
+          onClick={() => { setTab('resolved'); setFilter('all'); }}
+          className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4 cursor-pointer hover:shadow-lg hover:border-green-400 transition-all"
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
               <CheckCircle className="w-5 h-5 text-green-600" />
@@ -216,7 +232,7 @@ export default function Alerts() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="active" className="space-y-4">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="active">Active Alerts ({stats.active})</TabsTrigger>
           <TabsTrigger value="resolved">Resolved</TabsTrigger>
@@ -359,6 +375,14 @@ export default function Alerts() {
                           Order immediately
                         </Button>
                       )}
+                      <Button
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        size="sm"
+                        onClick={() => resolveAlert(alert.id)}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Resolve Alert
+                      </Button>
                     </div>
                   </div>
                 </div>

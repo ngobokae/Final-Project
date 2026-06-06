@@ -131,10 +131,29 @@ export default function ProcurementPlan() {
     });
     if (!ok) return;
 
-    await handleUpdateOrderStatus(order.id, 'delivered');
-    window.dispatchEvent(new CustomEvent('app:toast', { 
-      detail: { type: 'success', title: 'Goods Received', description: 'Inventory stock has been increased.' } 
-    }));
+    try {
+      // Call inventory endpoint to receive procurement goods
+      await apiPost('/api/inventory/receive-procurement', {
+        procurement_order_id: order.id,
+        auto_confirm: true
+      });
+      
+      // Update procurement status to delivered
+      await handleUpdateOrderStatus(order.id, 'delivered');
+      
+      window.dispatchEvent(new CustomEvent('app:toast', { 
+        detail: { type: 'success', title: 'Goods Received', description: 'Inventory stock has been increased and audit trail recorded.' } 
+      }));
+      
+      // Dispatch events for cross-module updates
+      window.dispatchEvent(new Event('app:operations-data-updated'));
+      window.dispatchEvent(new Event('app:notifications-changed'));
+    } catch (error) {
+      console.error('Failed to receive goods:', error);
+      window.dispatchEvent(new CustomEvent('app:toast', { 
+        detail: { type: 'error', title: 'Error', description: error?.message || 'Failed to receive goods.' } 
+      }));
+    }
   };
 
   const handleCreateOrder = async (e) => {
