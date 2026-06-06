@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -13,6 +13,7 @@ import { apiGet, apiPost } from '../../utils/api';
 import { formatCurrency } from '../../utils/currency';
 
 export default function OperationsDashboard() {
+  const navigate = useNavigate();
   const [metrics, setMetrics] = useState({
     salesThisMonth: null,
     salesGrowth: null,
@@ -232,7 +233,10 @@ export default function OperationsDashboard() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="hover:-translate-y-1 hover:shadow-md transition-all duration-300 dark:bg-neutral-900 border border-gray-100 dark:border-neutral-800">
+        <Card 
+          className="hover:-translate-y-1 hover:shadow-md transition-all duration-300 dark:bg-neutral-900 border border-gray-100 dark:border-neutral-800 cursor-pointer"
+          onClick={() => navigate('/operations/sales-data')}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-gray-500">Monthly Sales</CardTitle>
             <DollarSign className="h-4 w-4 text-gray-400" />
@@ -249,7 +253,10 @@ export default function OperationsDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="hover:-translate-y-1 hover:shadow-md transition-all duration-300 dark:bg-neutral-900 border border-gray-100 dark:border-neutral-800">
+        <Card 
+          className="hover:-translate-y-1 hover:shadow-md transition-all duration-300 dark:bg-neutral-900 border border-gray-100 dark:border-neutral-800 cursor-pointer"
+          onClick={() => navigate('/operations/demand-forecast')}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-gray-500">Forecast Accuracy</CardTitle>
             <TrendingUp className="h-4 w-4 text-gray-400" />
@@ -268,7 +275,10 @@ export default function OperationsDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="hover:-translate-y-1 hover:shadow-md transition-all duration-300 dark:bg-neutral-900 border border-gray-100 dark:border-neutral-800">
+        <Card 
+          className="hover:-translate-y-1 hover:shadow-md transition-all duration-300 dark:bg-neutral-900 border border-gray-100 dark:border-neutral-800 cursor-pointer"
+          onClick={() => navigate('/operations/procurement-plan')}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-gray-500">Pending Orders</CardTitle>
             <Package className="h-4 w-4 text-gray-400" />
@@ -287,15 +297,18 @@ export default function OperationsDashboard() {
           </CardContent>
         </Card>
 
-        <Card className={`border-0 shadow-lg text-white bg-gradient-to-br transition-all duration-500 hover:-translate-y-1 hover:shadow-xl ${
-          resilienceIndex === null
-            ? 'from-slate-500 to-slate-600'
-            : resilienceIndex >= 85
-            ? 'from-emerald-500 to-emerald-600'
-            : resilienceIndex >= 65
-            ? 'from-amber-500 to-amber-600'
-            : 'from-rose-500 to-rose-600'
-        }`}>
+        <Card 
+          className={`border-0 shadow-lg text-white bg-gradient-to-br transition-all duration-500 hover:-translate-y-1 hover:shadow-xl cursor-pointer ${
+            resilienceIndex === null
+              ? 'from-slate-500 to-slate-600'
+              : resilienceIndex >= 85
+              ? 'from-emerald-500 to-emerald-600'
+              : resilienceIndex >= 65
+              ? 'from-amber-500 to-amber-600'
+              : 'from-rose-500 to-rose-600'
+          }`}
+          onClick={() => navigate('/inventory/alerts')}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-bold uppercase tracking-wider text-white/90">Supply Chain Resilience</CardTitle>
             <ShieldCheck className="h-5 w-5 text-white" />

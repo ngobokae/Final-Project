@@ -77,6 +77,22 @@ export default function ExecutiveDashboard() {
     return map[range] || 30;
   };
 
+  const handleKpiCardClick = (kpiId) => {
+    const navigationMap = {
+      'revenue': '/executive/kpis',
+      'orders': '/executive/procurement-approvals',
+      'accuracy': '/executive/kpis',
+      'inventory': '/executive/kpis',
+      'stockout': '/executive/kpis',
+      'satisfaction': '/executive/kpis'
+    };
+    
+    const route = navigationMap[kpiId];
+    if (route) {
+      navigate(route);
+    }
+  };
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -425,7 +441,8 @@ export default function ExecutiveDashboard() {
           return (
             <Card
               key={kpi.id}
-              className="hover:shadow-lg transition-all"
+              className="hover:shadow-lg transition-all cursor-pointer"
+              onClick={() => handleKpiCardClick(kpi.id)}
             >
               <CardHeader className="pb-3 flex flex-row items-start justify-between space-y-0">
                 <div className="space-y-1">

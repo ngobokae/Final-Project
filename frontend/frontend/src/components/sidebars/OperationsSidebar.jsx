@@ -69,14 +69,14 @@ export default function OperationsSidebar() {
     {
       title: 'Data & Planning',
       items: [
-        { to: '/operations/sales-data', icon: Upload, label: 'Sales Data (Predict 2 – Sales)', badge: 'New' },
-        { to: '/operations/demand-forecast', icon: TrendingUp, label: 'Demand Forecast (Predict 2 – Demand)', badge: null },
+        { to: '/operations/sales-data', icon: Upload, label: 'Sales Data', badge: null },
+        { to: '/operations/demand-forecast', icon: TrendingUp, label: 'Demand Forecast', badge: null },
         { to: '/operations/production-plan', icon: Factory, label: 'Production Plan', badge: counts.production > 0 ? String(counts.production) : null },
-        { to: '/operations/procurement-plan', icon: Truck, label: 'Procurement Plan', badge: counts.procurement > 0 ? String(counts.procurement) : null }
+        { to: '/operations/procurement-plan', icon: Truck, label: 'Procurement Orders', badge: counts.procurement > 0 ? String(counts.procurement) : null }
       ]
     },
     {
-      title: 'Reports',
+      title: 'Reports & Analysis',
       items: [
         { to: '/operations/reports', icon: FileText, label: 'Reports', badge: null }
       ]

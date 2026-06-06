@@ -50,17 +50,12 @@ export default function AdminSidebar() {
       ]
     },
     {
-      title: 'Management',
+      title: 'System Management',
       items: [
         { to: '/admin/users', icon: Users, label: 'Users', badge: counts.users > 0 ? String(counts.users) : null },
         { to: '/admin/permissions', icon: Lock, label: 'Roles & Permissions', badge: null },
         { to: '/admin/system-settings', icon: Settings, label: 'System Settings', badge: null },
-        { to: '/admin/ai-models', icon: Brain, label: 'AI Models', badge: counts.models > 0 ? String(counts.models) : null }
-      ]
-    },
-    {
-      title: 'Security',
-      items: [
+        { to: '/admin/ai-models', icon: Brain, label: 'AI Models', badge: counts.models > 0 ? String(counts.models) : null },
         { to: '/admin/audit-logs', icon: FileText, label: 'Audit Logs', badge: null }
       ]
     },

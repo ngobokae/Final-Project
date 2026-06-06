@@ -182,21 +182,39 @@ export default function ProcurementPlan() {
     if (!ok) return;
 
     try {
-      await apiPost('/api/procurement', {
+      setCreatingOrder(true);
+      const payload = {
         product_id: rec.product_id,
         supplier_name: rec.supplier || 'AI Recommended Supplier',
         quantity: rec.recommended_qty,
         unit_cost: rec.unit_cost || 0,
         expected_delivery: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         notes: `AI Suggestion Engine: ${rec.reasoning}`
-      });
-      fetchData();
+      };
+      
+      const result = await apiPost('/api/procurement', payload);
+      
       window.dispatchEvent(new CustomEvent('app:toast', { 
-        detail: { type: 'success', title: 'Order Created', description: `Order for ${rec.product_name} has been created.` } 
+        detail: { 
+          type: 'success', 
+          title: 'Procurement Order Created', 
+          description: `Successfully created order for ${rec.product_name} (${rec.recommended_qty} units).` 
+        } 
       }));
+      
+      window.dispatchEvent(new Event('app:operations-data-updated'));
+      await fetchData();
     } catch (error) {
       console.error('Failed to create order from recommendation:', error);
-      alert('Failed to create order: ' + (error.message || 'Unknown error'));
+      window.dispatchEvent(new CustomEvent('app:toast', { 
+        detail: { 
+          type: 'error', 
+          title: 'Failed to Create Order', 
+          description: error?.message || 'Unable to create procurement order. Please try again.' 
+        } 
+      }));
+    } finally {
+      setCreatingOrder(false);
     }
   };
 

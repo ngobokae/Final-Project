@@ -91,13 +91,26 @@ export default function StockOverview() {
         reason: stockForm.reason || 'Stock addition'
       });
 
+      window.dispatchEvent(new CustomEvent('app:toast', {
+        detail: {
+          type: 'success',
+          title: 'Stock Updated',
+          description: `Successfully added ${stockForm.quantity} units to inventory.`
+        }
+      }));
+
       await fetchInventory();
       setShowAddStockModal(false);
       setStockForm({ product_id: '', quantity: '', reason: '' });
-      alert('Stock added successfully');
     } catch (error) {
       console.error('Failed to add stock:', error);
-      alert('Failed to add stock. Please try again.');
+      window.dispatchEvent(new CustomEvent('app:toast', {
+        detail: {
+          type: 'error',
+          title: 'Failed',
+          description: error?.message || 'Could not add stock. Please try again.'
+        }
+      }));
     }
   };
 

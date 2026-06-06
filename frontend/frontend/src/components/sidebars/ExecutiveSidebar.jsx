@@ -39,23 +39,23 @@ export default function ExecutiveSidebar() {
 
   const menuSections = [
     {
-      title: 'Strategic Oversight',
+      title: 'Overview',
       items: [
-        { to: '/executive/dashboard', icon: BarChart3, label: 'Dashboard', badge: null },
+        { to: '/executive/dashboard', icon: BarChart3, label: 'Dashboard', badge: null }
+      ]
+    },
+    {
+      title: 'AI & Intelligence',
+      items: [
+        { to: '/executive/insights', icon: Lightbulb, label: 'AI Insights', badge: insightsCount > 0 ? String(insightsCount) : null },
         { to: '/executive/kpis', icon: Target, label: 'KPIs & Metrics', badge: null }
       ]
     },
     {
-      title: 'Approvals',
+      title: 'Operations & Reports',
       items: [
-        { to: '/executive/procurement-approvals', icon: ShoppingCart, label: 'Procurement Orders', badge: null }
-      ]
-    },
-    {
-      title: 'Performance',
-      items: [
+        { to: '/executive/procurement-approvals', icon: ShoppingCart, label: 'Approvals', badge: null },
         { to: '/executive/reports', icon: FileText, label: 'Reports', badge: null },
-        { to: '/executive/insights', icon: Lightbulb, label: 'AI Insights', badge: insightsCount > 0 ? String(insightsCount) : null },
         { to: '/executive/simulator', icon: Calculator, label: 'ROI Simulator', badge: null }
       ]
     },

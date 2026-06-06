@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
+import { Badge } from '../../components/ui/badge';
 import { Input } from '../../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { apiGet, apiPost } from '../../utils/api';
-import { ArrowDownCircle, ArrowUpCircle, PackagePlus, ShoppingCart, Truck } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, PackagePlus, ShoppingCart, Truck, Brain, Package } from 'lucide-react';
 import { formatCurrency } from '../../utils/currency';
 
 const TXN_OPTIONS = [
@@ -381,44 +382,68 @@ export default function StockTransactions() {
 
       <Card>
         <CardHeader>
-          <CardTitle>AI Procurement Recommendations</CardTitle>
-          <CardDescription>Create inventory orders from AI recommendation list.</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Brain className="w-5 h-5 text-purple-600" />
+            AI Procurement Recommendations
+          </CardTitle>
+          <CardDescription>Smart inventory optimization suggestions. Click "Create Order" to prefill the transaction form.</CardDescription>
         </CardHeader>
         <CardContent>
           {recommendations.length === 0 ? (
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              No recommendations available yet.
+            <div className="flex items-center justify-center py-8 text-gray-500 dark:text-gray-400">
+              <p className="text-sm">No recommendations available yet.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="border-b border-gray-200 dark:border-neutral-700">
-                  <tr>
-                    <th className="text-left py-2">Product</th>
-                    <th className="text-left py-2">SKU</th>
-                    <th className="text-left py-2">Current</th>
-                    <th className="text-left py-2">Recommended Qty</th>
-                    <th className="text-left py-2">Risk</th>
-                    <th className="text-left py-2">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recommendations.map((rec, idx) => (
-                    <tr key={`${rec.product_id}-${idx}`} className="border-b border-gray-100 dark:border-neutral-800">
-                      <td className="py-2">{rec.product_name || '-'}</td>
-                      <td className="py-2">{rec.sku || '-'}</td>
-                      <td className="py-2">{rec.current_stock ?? rec.available_stock ?? 0}</td>
-                      <td className="py-2">{rec.effective_order_quantity ?? rec.optimal_order_quantity ?? 0}</td>
-                      <td className="py-2">{rec.risk_level || '-'}</td>
-                      <td className="py-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => handleOrderFromRecommendation(rec)}>
-                          Order
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="grid gap-3">
+              {recommendations.map((rec, idx) => (
+                <div
+                  key={`${rec.product_id}-${idx}`}
+                  className="border border-purple-200 dark:border-purple-900/50 rounded-lg p-4 hover:bg-purple-50 dark:hover:bg-purple-950/20 transition"
+                >
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-semibold text-gray-900 dark:text-gray-100">
+                          {rec.product_name || 'Unknown Product'}
+                        </h4>
+                        <span className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
+                          {rec.sku || 'N/A'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {rec.reasoning || 'Inventory optimization recommendation'}
+                      </p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2 text-sm">
+                        <div>
+                          <span className="text-gray-600 dark:text-gray-400">Current: </span>
+                          <span className="font-semibold">{rec.current_stock ?? rec.available_stock ?? 0}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600 dark:text-gray-400">Reorder Pt: </span>
+                          <span className="font-semibold">{rec.reorder_point ?? '-'}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600 dark:text-gray-400">Qty to Order: </span>
+                          <span className="font-semibold text-purple-600">{rec.effective_order_quantity ?? rec.optimal_order_quantity ?? 0}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600 dark:text-gray-400">Risk: </span>
+                          <span className={`font-semibold ${rec.risk_level === 'critical' ? 'text-red-600' : rec.risk_level === 'high' ? 'text-amber-600' : 'text-green-600'}`}>
+                            {rec.risk_level || 'Normal'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                      onClick={() => handleOrderFromRecommendation(rec)}
+                    >
+                      Create Order
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
@@ -535,51 +560,82 @@ export default function StockTransactions() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-sm text-gray-500 dark:text-gray-400">Loading...</div>
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+            </div>
           ) : transactions.length === 0 ? (
-            <div className="text-sm text-gray-500 dark:text-gray-400">No transactions yet.</div>
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <Package className="w-12 h-12 mx-auto opacity-50 mb-2" />
+              <p>No transactions yet.</p>
+            </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="border-b border-gray-200 dark:border-neutral-700">
-                  <tr>
-                    <th className="text-left py-2">Date</th>
-                    <th className="text-left py-2">Product</th>
-                    <th className="text-left py-2">Type</th>
-                    <th className="text-left py-2">Qty</th>
-                    <th className="text-left py-2">Amount</th>
-                    <th className="text-left py-2">Customer</th>
-                    <th className="text-left py-2">Region</th>
-                    <th className="text-left py-2">Stock</th>
-                    <th className="text-left py-2">User</th>
-                    <th className="text-left py-2">Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactions.map((t) => (
-                    <tr key={t.id} className="border-b border-gray-100 dark:border-neutral-800">
-                      <td className="py-2">{new Date(t.created_at).toLocaleString()}</td>
-                      <td className="py-2">
-                        <div className="font-medium text-gray-900 dark:text-gray-100">{t.product_name || '-'}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{t.sku || '-'}</div>
-                      </td>
-                      <td className="py-2">{transactionLabelMap[t.transaction_type] || t.transaction_type}</td>
-                      <td className="py-2">{t.quantity}</td>
-                      <td className="py-2">{getTxnAmount(t) != null ? formatCurrency(getTxnAmount(t)) : '-'}</td>
-                      <td className="py-2">{t.customer_name || '-'}</td>
-                      <td className="py-2">{t.region || '-'}</td>
-                      <td className="py-2">
-                        {t.previous_stock ?? '-'} {'->'} {t.new_stock ?? '-'}
-                      </td>
-                      <td className="py-2">{t.user_name || '-'}</td>
-                      <td className="py-2">{t.notes || '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
-                Total amount (Sold + Stock Out) in this list: <span className="font-semibold">{formatCurrency(transactionAmountSummary.total)}</span>
-                {transactionAmountSummary.count > 0 ? ` (${transactionAmountSummary.count} transaction(s))` : ''}
+            <div className="space-y-3">
+              {transactions.map((t) => {
+                const txnColor = {
+                  'stock_in': 'border-l-4 border-l-green-500 bg-green-50 dark:bg-green-950/20',
+                  'stock_out': 'border-l-4 border-l-red-500 bg-red-50 dark:bg-red-950/20',
+                  'sold': 'border-l-4 border-l-blue-500 bg-blue-50 dark:bg-blue-950/20',
+                  'ordered': 'border-l-4 border-l-purple-500 bg-purple-50 dark:bg-purple-950/20',
+                  'adjustment_in': 'border-l-4 border-l-amber-500 bg-amber-50 dark:bg-amber-950/20',
+                  'adjustment_out': 'border-l-4 border-l-orange-500 bg-orange-50 dark:bg-orange-950/20'
+                }[t.transaction_type] || 'border-l-4 border-l-gray-400 bg-gray-50 dark:bg-gray-800/20';
+
+                return (
+                  <div key={t.id} className={`p-4 rounded-lg ${txnColor}`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold text-gray-900 dark:text-gray-100">
+                            {t.product_name || '-'}
+                          </h4>
+                          <span className="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                            {t.sku || '-'}
+                          </span>
+                          <Badge variant="outline">
+                            {transactionLabelMap[t.transaction_type] || t.transaction_type}
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2 text-sm">
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">Qty: </span>
+                            <span className="font-semibold">{t.quantity}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">Amount: </span>
+                            <span className="font-semibold">{getTxnAmount(t) != null ? formatCurrency(getTxnAmount(t)) : '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">Stock Change: </span>
+                            <span className="font-semibold">{t.previous_stock ?? '?'} → {t.new_stock ?? '?'}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">Date: </span>
+                            <span className="font-semibold text-xs">{new Date(t.created_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                        {(t.customer_name || t.region) && (
+                          <div className="flex items-center gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
+                            {t.customer_name && <span>Customer: <span className="font-medium text-gray-900 dark:text-gray-100">{t.customer_name}</span></span>}
+                            {t.region && <span>Region: <span className="font-medium text-gray-900 dark:text-gray-100">{t.region}</span></span>}
+                          </div>
+                        )}
+                        {t.notes && (
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 italic">
+                            Note: {t.notes}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 sm:flex-col sm:items-end">
+                        <span>By: {t.user_name || 'System'}</span>
+                        <span>{new Date(t.created_at).toLocaleTimeString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-neutral-700 text-sm text-gray-600 dark:text-gray-400">
+                <strong>Summary:</strong> Total amount (Sold + Stock Out) in this view: <span className="font-semibold text-gray-900 dark:text-gray-100">{formatCurrency(transactionAmountSummary.total)}</span>
+                {transactionAmountSummary.count > 0 ? ` from ${transactionAmountSummary.count} transaction(s)` : ''}
               </div>
             </div>
           )}

@@ -243,26 +243,6 @@ export default function PendingReceivables() {
         </CardContent>
       </Card>
 
-      {/* Instructions */}
-      <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900">
-        <CardHeader>
-          <CardTitle className="text-blue-900 dark:text-blue-200">Workflow Overview</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm text-blue-800 dark:text-blue-300">
-          <p>
-            <strong>1. Operations Manager:</strong> Creates and approves procurement orders
-          </p>
-          <p>
-            <strong>2. Inventory Manager:</strong> Reviews pending orders here and clicks "Receive" when goods arrive
-          </p>
-          <p>
-            <strong>3. Automatic:</strong> Stock is added to inventory, alerts are resolved, and order is marked as delivered
-          </p>
-          <p>
-            <strong>4. Tracking:</strong> All transactions are recorded in Stock Transactions for audit trail
-          </p>
-        </CardContent>
-      </Card>
     </div>
   );
 }

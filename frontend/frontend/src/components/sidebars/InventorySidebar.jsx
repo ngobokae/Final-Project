@@ -48,24 +48,23 @@ export default function InventorySidebar() {
     {
       title: 'Overview',
       items: [
-        { to: '/inventory/dashboard', icon: BarChart3, label: 'Dashboard', badge: null }
+        { to: '/inventory/dashboard', icon: BarChart3, label: 'Dashboard', badge: null },
+        { to: '/inventory/stock-overview', icon: Package, label: 'Stock Overview', badge: counts.stock > 0 ? String(counts.stock) : null }
       ]
     },
     {
-      title: 'Inventory Management',
+      title: 'Inventory Operations',
       items: [
-        { to: '/inventory/stock-overview', icon: Package, label: 'Stock Overview', badge: counts.stock > 0 ? String(counts.stock) : null },
-        { to: '/inventory/stock-transactions', icon: ArrowUpDown, label: 'Logistics & Warehouse', badge: null },
+        { to: '/inventory/stock-transactions', icon: ArrowUpDown, label: 'Stock Transactions', badge: null },
         { to: '/inventory/pending-receivables', icon: Truck, label: 'Pending Receivables', badge: null },
         { to: '/inventory/warehouse-map', icon: Warehouse, label: 'Warehouse Map', badge: null },
-        { to: '/inventory/labels', icon: QrCode, label: 'QR Labels', badge: null },
-        { to: '/inventory/optimization', icon: Zap, label: 'Optimization', badge: null },
         { to: '/inventory/alerts', icon: AlertTriangle, label: 'Alerts', badge: counts.alerts > 0 ? String(counts.alerts) : null }
       ]
     },
     {
-      title: 'Reports',
+      title: 'Reports & Tools',
       items: [
+        { to: '/inventory/labels', icon: QrCode, label: 'QR Labels', badge: null },
         { to: '/inventory/reports', icon: FileText, label: 'Reports', badge: null }
       ]
     },

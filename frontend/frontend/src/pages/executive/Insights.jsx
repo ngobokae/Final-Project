@@ -245,7 +245,10 @@ export default function Insights() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4">
+        <div 
+          className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4 cursor-pointer hover:shadow-md transition-shadow hover:border-amber-300"
+          onClick={() => setFilter('all')}
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
               <Lightbulb className="w-5 h-5 text-amber-600" />
@@ -256,7 +259,10 @@ export default function Insights() {
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4">
+        <div 
+          className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4 cursor-pointer hover:shadow-md transition-shadow hover:border-emerald-300"
+          onClick={() => setFilter('opportunity')}
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
               <TrendingUp className="w-5 h-5 text-emerald-600" />
@@ -267,7 +273,10 @@ export default function Insights() {
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4">
+        <div 
+          className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4 cursor-pointer hover:shadow-md transition-shadow hover:border-amber-300"
+          onClick={() => setFilter('warning')}
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
               <AlertTriangle className="w-5 h-5 text-amber-600" />
@@ -278,7 +287,10 @@ export default function Insights() {
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4">
+        <div 
+          className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4 cursor-pointer hover:shadow-md transition-shadow hover:border-blue-300"
+          onClick={() => setFilter('success')}
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
               <CheckCircle className="w-5 h-5 text-blue-600" />
