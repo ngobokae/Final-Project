@@ -36,7 +36,6 @@ import InventoryReports from './pages/inventory/Reports';
 import WarehouseMap from './pages/inventory/WarehouseMap';
 import QRLabelGenerator from './pages/inventory/QRLabelGenerator';
 import PendingReceivables from './pages/inventory/PendingReceivables';
-
 // Executive Pages
 import ExecutiveDashboard from './pages/executive/Dashboard';
 import KPIs from './pages/executive/KPIs';

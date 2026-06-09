@@ -44,6 +44,28 @@ export default function QRLabelGenerator() {
     }
   };
 
+  const buildQrPayload = (item) => {
+    const totalUnits = Number(item.available_stock ?? item.current_stock ?? 0);
+    const unitPrice = Number(item.unit_price ?? 0);
+    const unitCost = Number(item.unit_cost ?? 0);
+    return JSON.stringify({
+      app: 'Kinglion',
+      sku: item.sku,
+      name: item.product_name,
+      category: item.category || null,
+      unit_price: unitPrice,
+      unit_cost: unitCost,
+      current_stock: Number(item.current_stock ?? 0),
+      available_stock: Number(item.available_stock ?? totalUnits),
+      total_units: totalUnits,
+      total_value: totalUnits * unitPrice,
+      total_cost_value: totalUnits * unitCost,
+      reorder_point: item.reorder_point ?? null,
+      safety_stock: item.safety_stock ?? null,
+      generated_at: new Date().toISOString()
+    });
+  };
+
   const generatePDF = async () => {
     const doc = new jsPDF();
     const itemsToPrint = inventory.filter(i => selectedItems.includes(i.product_id));
@@ -61,8 +83,8 @@ export default function QRLabelGenerator() {
       const boxHeight = 60;
 
       for (const item of itemsToPrint) {
-        // Generate QR code data URL with just SKU (simpler data = better scannability)
-        const qrData = await QRCode.toDataURL(item.sku, {
+        const qrPayload = buildQrPayload(item);
+        const qrData = await QRCode.toDataURL(qrPayload, {
           errorCorrectionLevel: 'M',
           type: 'image/png',
           quality: 0.92,
@@ -73,6 +95,10 @@ export default function QRLabelGenerator() {
             light: '#FFFFFF'
           }
         });
+
+        const totalUnits = Number(item.available_stock ?? item.current_stock ?? 0);
+        const unitPrice = Number(item.unit_price ?? 0);
+        const totalValue = totalUnits * unitPrice;
 
         // Draw label box
         doc.setDrawColor(100, 100, 100);
@@ -92,14 +118,16 @@ export default function QRLabelGenerator() {
         doc.setFontSize(7);
         doc.text(`SKU: ${item.sku}`, x + 5, y + 22);
         doc.text(`CAT: ${item.category || 'N/A'}`, x + 5, y + 27);
-        doc.text(`Stock: ${item.available_stock || 0}`, x + 5, y + 32);
+        doc.text(`Units: ${totalUnits}`, x + 5, y + 32);
+        doc.text(`Price: ${unitPrice.toFixed(0)} RWF`, x + 5, y + 37);
+        doc.text(`Total: ${totalValue.toFixed(0)} RWF`, x + 5, y + 42);
         
         // Add QR Code image (right side, larger size)
         doc.addImage(qrData, 'PNG', x + 60, y + 5, 35, 35);
         
         // Add barcode label
         doc.setFontSize(6);
-        doc.text('SCAN QR', x + 70, y + 42);
+        doc.text('SCAN FOR FULL INFO', x + 62, y + 42);
 
         // Move to next position
         x += boxWidth + 8;
@@ -121,7 +149,7 @@ export default function QRLabelGenerator() {
         detail: { 
           type: 'success', 
           title: 'PDF Generated', 
-          description: `${itemsToPrint.length} labels with scannable QR codes ready for printing. Make sure to print at 100% scale.` 
+          description: `${itemsToPrint.length} labels with QR codes containing full product details (units, price, stock). Print at 100% scale.` 
         } 
       }));
     } catch (error) {
@@ -142,7 +170,7 @@ export default function QRLabelGenerator() {
             <QrCode className="w-7 h-7 text-red-600" />
             Stock Label Generator
           </h1>
-          <p className="text-gray-500 mt-1">Generate printable labels with QR codes for shelf organization</p>
+          <p className="text-gray-500 mt-1">Generate printable labels with QR codes containing full product information</p>
         </div>
         <div className="flex gap-2">
           <Button 

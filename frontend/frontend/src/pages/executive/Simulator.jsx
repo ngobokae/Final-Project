@@ -34,25 +34,51 @@ export default function ExecutiveSimulator() {
     }
   };
 
+  const MARGIN_RATE = 0.25;
+
   const calculateProjection = () => {
     if (!salesData || salesData.length === 0) {
-      return [
-        { month: 'Current', revenue: 0, profit: 0 },
-        { month: 'Projected', revenue: 0, profit: 0 }
-      ];
+      return {
+        rows: [
+          { month: 'Current', revenue: 0, profit: 0 },
+          { month: 'Projected', revenue: 0, profit: 0 }
+        ],
+        currentRevenue: 0,
+        currentProfit: 0,
+        projectedRevenue: 0,
+        projectedProfit: 0,
+        costSavings: 0,
+        roiPercent: 0,
+        profitChange: 0
+      };
     }
-    const current = salesData[0];
-    const newRevenue = current.revenue * (1 + priceChange / 100);
-    const newProfit = (newRevenue * 0.25) + (current.revenue * (costReduction / 100));
-    
-    return [
-      current,
-      { month: 'Projected', revenue: newRevenue, profit: newProfit }
-    ];
+
+    const currentRevenue = Number(salesData[0].revenue || 0);
+    const currentProfit = currentRevenue * MARGIN_RATE;
+    const projectedRevenue = currentRevenue * (1 + priceChange / 100);
+    const baseProjectedProfit = projectedRevenue * MARGIN_RATE;
+    const costSavings = currentRevenue * (costReduction / 100);
+    const projectedProfit = baseProjectedProfit + costSavings;
+    const profitChange = currentProfit > 0 ? ((projectedProfit - currentProfit) / currentProfit) * 100 : 0;
+    const roiPercent = currentProfit > 0 ? ((projectedProfit - currentProfit) / currentProfit) * 100 : 0;
+
+    return {
+      rows: [
+        { month: 'Current', revenue: currentRevenue, profit: currentProfit },
+        { month: 'Projected', revenue: projectedRevenue, profit: projectedProfit }
+      ],
+      currentRevenue,
+      currentProfit,
+      projectedRevenue,
+      projectedProfit,
+      costSavings,
+      roiPercent,
+      profitChange
+    };
   };
 
   const projection = calculateProjection();
-  const profitChange = projection[0].profit > 0 ? ((projection[1].profit - projection[0].profit) / projection[0].profit) * 100 : 0;
+  const profitChange = projection.profitChange;
 
   return (
     <div className="space-y-6">
@@ -60,9 +86,9 @@ export default function ExecutiveSimulator() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Calculator className="w-7 h-7 text-purple-600" />
-            Kinglion Profit Simulator
+            Kinglion ROI Simulator
           </h1>
-          <p className="text-gray-500 mt-1">Simulate market changes to predict future revenue and profit</p>
+          <p className="text-gray-500 mt-1">Clear ROI from price changes and operational cost efficiency</p>
         </div>
         <Button variant="outline" onClick={fetchSalesData}>
           <RefreshCcw className="w-4 h-4 mr-2" />
@@ -119,12 +145,19 @@ export default function ExecutiveSimulator() {
               </div>
             </div>
 
-            <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
-              <h4 className="text-xs uppercase font-bold text-purple-600 mb-2">Executive Summary</h4>
-              <p className="text-sm text-purple-900 leading-relaxed">
-                A {priceChange}% price change combined with {costReduction}% cost efficiency will result in a 
-                <span className="font-bold"> {profitChange.toFixed(1)}% {profitChange >= 0 ? 'increase' : 'decrease'} </span>
-                in monthly net profit.
+            <div className="p-4 bg-purple-50 rounded-xl border border-purple-100 space-y-2">
+              <h4 className="text-xs uppercase font-bold text-purple-600">ROI Calculation</h4>
+              <p className="text-xs text-purple-900">
+                Current profit = Revenue × {Math.round(MARGIN_RATE * 100)}% margin
+              </p>
+              <p className="text-xs text-purple-900">
+                Projected profit = (Adjusted revenue × {Math.round(MARGIN_RATE * 100)}%) + Cost savings
+              </p>
+              <p className="text-xs text-purple-900">
+                ROI = (Projected profit − Current profit) ÷ Current profit × 100
+              </p>
+              <p className="text-sm text-purple-900 font-semibold pt-1">
+                ROI: {projection.roiPercent.toFixed(1)}% ({profitChange >= 0 ? '+' : ''}{formatCurrency(projection.projectedProfit - projection.currentProfit)} / month)
               </p>
             </div>
           </CardContent>
@@ -138,7 +171,7 @@ export default function ExecutiveSimulator() {
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={projection}>
+                <LineChart data={projection.rows}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="month" />
                   <YAxis tickFormatter={(val) => `FRW ${val/1000000}M`} />
@@ -153,7 +186,7 @@ export default function ExecutiveSimulator() {
             <div className="grid grid-cols-2 gap-4 mt-8">
               <div className="p-4 bg-gray-50 rounded-xl">
                  <div className="text-xs text-gray-500 mb-1">Projected Revenue</div>
-                 <div className="text-xl font-bold text-gray-900">{formatCurrency(projection[1].revenue)}</div>
+                 <div className="text-xl font-bold text-gray-900">{formatCurrency(projection.projectedRevenue)}</div>
                  <div className={`text-xs flex items-center gap-1 mt-1 ${priceChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                    {priceChange >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                    {Math.abs(priceChange)}% vs current
@@ -161,7 +194,7 @@ export default function ExecutiveSimulator() {
               </div>
               <div className="p-4 bg-gray-50 rounded-xl">
                  <div className="text-xs text-gray-500 mb-1">Projected Profit</div>
-                 <div className="text-xl font-bold text-gray-900">{formatCurrency(projection[1].profit)}</div>
+                 <div className="text-xl font-bold text-gray-900">{formatCurrency(projection.projectedProfit)}</div>
                  <div className={`text-xs flex items-center gap-1 mt-1 ${profitChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                    {profitChange >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                    {Math.abs(profitChange).toFixed(1)}% vs current

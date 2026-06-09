@@ -13,7 +13,7 @@ const TXN_OPTIONS = [
   { value: 'stock_in', label: 'Stock In', icon: PackagePlus },
   { value: 'stock_out', label: 'Stock Out', icon: ArrowDownCircle },
   { value: 'sold', label: 'Sold (Stock Out)', icon: ShoppingCart },
-  { value: 'ordered', label: 'Ordered (Stock In)', icon: Truck },
+  { value: 'ordered', label: 'Ordered (PO — no stock yet)', icon: Truck },
   { value: 'adjustment_in', label: 'Adjustment In', icon: ArrowUpCircle },
   { value: 'adjustment_out', label: 'Adjustment Out', icon: ArrowDownCircle }
 ];
@@ -40,9 +40,17 @@ export default function StockTransactions() {
     notes: ''
   });
   const [prefillNotice, setPrefillNotice] = useState('');
+  const [orderingRecIds, setOrderingRecIds] = useState({});
 
   const transactionLabelMap = useMemo(
-    () => Object.fromEntries(TXN_OPTIONS.map((o) => [o.value, o.label])),
+    () => ({
+      ...Object.fromEntries(TXN_OPTIONS.map((o) => [o.value, o.label])),
+      order_approved: 'Order Approved',
+      in_transit: 'In Transit (Delivery Pending)',
+      order_cancelled: 'Order Declined',
+      order_delayed: 'Order Delayed',
+      procurement_status: 'Procurement Update',
+    }),
     []
   );
 
@@ -86,7 +94,13 @@ export default function StockTransactions() {
       const recList = Array.isArray(recsRes)
         ? recsRes
         : recsRes?.recommendations || recsRes?.data || [];
-      setRecommendations(recList.slice(0, 20));
+      const lowStockRecs = recList.filter((rec) => {
+        const qty = Number(rec?.effective_order_quantity ?? rec?.optimal_order_quantity ?? 0);
+        const stock = Number(rec?.current_stock ?? rec?.available_stock ?? 0);
+        const reorder = Number(rec?.reorder_point ?? 0);
+        return qty > 0 && stock < reorder;
+      });
+      setRecommendations(lowStockRecs.slice(0, 20));
       const salesRes = await apiGet('/api/sales?limit=500');
       setSalesRows(salesRes?.sales || []);
     } catch (e) {
@@ -99,6 +113,17 @@ export default function StockTransactions() {
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  useEffect(() => {
+    const onForecastsUpdated = () => loadData();
+    const onOpsUpdated = () => loadData();
+    window.addEventListener('app:forecasts-updated', onForecastsUpdated);
+    window.addEventListener('app:operations-data-updated', onOpsUpdated);
+    return () => {
+      window.removeEventListener('app:forecasts-updated', onForecastsUpdated);
+      window.removeEventListener('app:operations-data-updated', onOpsUpdated);
+    };
   }, []);
 
   useEffect(() => {
@@ -285,20 +310,48 @@ export default function StockTransactions() {
     }
   };
 
-  const handleOrderFromRecommendation = (rec) => {
+  const handleOrderFromRecommendation = async (rec) => {
     const suggestedQty = Number(rec?.effective_order_quantity ?? rec?.optimal_order_quantity ?? 0);
     if (!rec?.product_id || suggestedQty <= 0) {
       setError('Recommendation is missing product or quantity.');
       return;
     }
-    setForm((prev) => ({
-      ...prev,
-      product_id: String(rec.product_id),
-      transaction_type: 'ordered',
-      quantity: String(Math.max(1, suggestedQty)),
-      notes: `AI recommendation: ${rec.reasoning || 'Inventory optimization recommendation'}`
-    }));
-    setPrefillNotice('Prefilled from AI recommendation. Please add supplier/source and region, then record transaction.');
+
+    const recKey = String(rec.product_id);
+    setOrderingRecIds((prev) => ({ ...prev, [recKey]: true }));
+    setError('');
+    setPrefillNotice('');
+
+    try {
+      const quantity = Math.max(1, suggestedQty);
+      const unitCost = Number(rec.unit_cost || 0);
+      await apiPost('/api/procurement', {
+        product_id: Number(rec.product_id),
+        supplier_name: 'Kinglion Rwanda Main Supplier',
+        quantity,
+        unit_cost: unitCost,
+        expected_delivery: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        notes: `AI recommendation from Inventory: ${rec.reasoning || 'Inventory optimization recommendation'}`
+      });
+
+      window.dispatchEvent(new Event('app:operations-data-updated'));
+      window.dispatchEvent(new Event('app:forecasts-updated'));
+      window.dispatchEvent(new Event('app:notifications-changed'));
+      window.dispatchEvent(new CustomEvent('app:toast', {
+        detail: {
+          type: 'success',
+          title: 'Order Sent to Operations',
+          description: `Procurement order for ${quantity} units of ${rec.product_name || 'product'} is pending approval.`
+        }
+      }));
+
+      await loadData();
+    } catch (e) {
+      console.error('Failed to create order from recommendation:', e);
+      setError(e?.message || 'Failed to record stock from recommendation.');
+    } finally {
+      setOrderingRecIds((prev) => ({ ...prev, [recKey]: false }));
+    }
   };
 
   return (
@@ -307,7 +360,7 @@ export default function StockTransactions() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Stock Transactions</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Record product stock in/out, sold, and ordered movements.
+            Record product stock in/out, sold, and ordered movements. All procurement status changes from Operations appear here.
           </p>
         </div>
         <Button variant="outline" onClick={exportStockCsv}>
@@ -386,7 +439,7 @@ export default function StockTransactions() {
             <Brain className="w-5 h-5 text-purple-600" />
             AI Procurement Recommendations
           </CardTitle>
-          <CardDescription>Smart inventory optimization suggestions. Click "Create Order" to prefill the transaction form.</CardDescription>
+          <CardDescription>Smart inventory optimization suggestions. Click &quot;Create Order&quot; to send a procurement request to Operations for approval.</CardDescription>
         </CardHeader>
         <CardContent>
           {recommendations.length === 0 ? (
@@ -437,9 +490,10 @@ export default function StockTransactions() {
                     <Button
                       type="button"
                       className="bg-purple-600 hover:bg-purple-700 text-white"
+                      disabled={orderingRecIds[String(rec.product_id)]}
                       onClick={() => handleOrderFromRecommendation(rec)}
                     >
-                      Create Order
+                      {orderingRecIds[String(rec.product_id)] ? 'Sending...' : 'Create Order'}
                     </Button>
                   </div>
                 </div>
@@ -576,6 +630,10 @@ export default function StockTransactions() {
                   'stock_out': 'border-l-4 border-l-red-500 bg-red-50 dark:bg-red-950/20',
                   'sold': 'border-l-4 border-l-blue-500 bg-blue-50 dark:bg-blue-950/20',
                   'ordered': 'border-l-4 border-l-purple-500 bg-purple-50 dark:bg-purple-950/20',
+                  'order_approved': 'border-l-4 border-l-indigo-500 bg-indigo-50 dark:bg-indigo-950/20',
+                  'in_transit': 'border-l-4 border-l-amber-500 bg-amber-50 dark:bg-amber-950/20',
+                  'order_cancelled': 'border-l-4 border-l-gray-500 bg-gray-50 dark:bg-gray-800/20',
+                  'order_delayed': 'border-l-4 border-l-orange-500 bg-orange-50 dark:bg-orange-950/20',
                   'adjustment_in': 'border-l-4 border-l-amber-500 bg-amber-50 dark:bg-amber-950/20',
                   'adjustment_out': 'border-l-4 border-l-orange-500 bg-orange-50 dark:bg-orange-950/20'
                 }[t.transaction_type] || 'border-l-4 border-l-gray-400 bg-gray-50 dark:bg-gray-800/20';

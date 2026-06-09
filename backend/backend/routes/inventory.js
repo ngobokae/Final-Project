@@ -1,4 +1,5 @@
 import { query } from '../config/database.js';
+import { clearInventoryRecommendationForProduct } from '../utils/procurementHelpers.js';
 import { parseBody, sendJSON, sendError } from '../utils/helpers.js';
 import { logAudit } from '../utils/logger.js';
 import { buildAlertEmailHtml, sendEmail } from '../utils/email.js';
@@ -634,6 +635,19 @@ export const handleCreateInventoryTransaction = async (req, res) => {
       }
     }
 
+    if (transactionType === 'stock_in' || transactionType === 'adjustment_in') {
+      await query(
+        `
+          UPDATE alerts
+          SET is_resolved = TRUE, resolved_at = NOW(), resolved_by = ?
+          WHERE product_id = ?
+            AND is_resolved = FALSE
+            AND alert_type IN ('shortage', 'reorder', 'forecast_anomaly')
+        `,
+        [req.user?.id || null, productId]
+      ).catch(() => {});
+    }
+
     await logAudit(
       req.user?.id || null,
       `INVENTORY_TXN_${transactionType.toUpperCase()}`,
@@ -750,7 +764,12 @@ export const handleGetInventoryTransactions = async (req, res) => {
         sku: details.sku || null,
         quantity: Number(details.quantity || 0),
         unit_price: details.unit_price != null ? Number(details.unit_price) : null,
-        total_amount: details.total_amount != null ? Number(details.total_amount) : null,
+        total_amount:
+          details.total_amount != null
+            ? Number(details.total_amount)
+            : details.unit_price != null && Number(details.quantity || 0) > 0
+              ? Number(details.unit_price) * Number(details.quantity)
+              : null,
         customer_name: details.customer_name || null,
         region: details.region || null,
         delta: Number(details.delta || 0),
@@ -1085,10 +1104,28 @@ export const handleReceiveProcurementGoods = async (req, res) => {
     }
 
     const order = procurementRows[0];
+    const currentStatus = String(order.status || '').toLowerCase();
+
+    if (currentStatus === 'delivered') {
+      return sendError(res, 400, 'Goods for this order have already been received.');
+    }
+    if (currentStatus === 'cancelled') {
+      return sendError(res, 400, 'Cannot receive goods for a cancelled order.');
+    }
+    if (!['approved', 'in_transit'].includes(currentStatus)) {
+      return sendError(
+        res,
+        400,
+        `Order must be approved or in transit before receiving. Current status: ${order.status || 'pending'}.`
+      );
+    }
+
     const productId = order.product_id;
     const quantity = Number(order.quantity || 0);
     const previousStock = Number(order.current_stock || 0);
     const newStock = previousStock + quantity;
+    const unitCost = Number(order.unit_cost || 0);
+    const totalAmount = unitCost > 0 && quantity > 0 ? unitCost * quantity : 0;
 
     if (quantity <= 0) {
       return sendError(res, 400, 'Invalid quantity in procurement order');
@@ -1112,6 +1149,8 @@ export const handleReceiveProcurementGoods = async (req, res) => {
         sku: order.sku,
         transaction_type: 'stock_in',
         quantity: quantity,
+        unit_price: unitCost > 0 ? unitCost : null,
+        total_amount: totalAmount > 0 ? totalAmount : null,
         procurement_order_id: procurementOrderId,
         supplier_name: order.supplier_name,
         delta: quantity,
@@ -1139,6 +1178,8 @@ export const handleReceiveProcurementGoods = async (req, res) => {
         ['delivered', procurementOrderId]
       );
     }
+
+    await clearInventoryRecommendationForProduct(productId);
 
     sendJSON(res, 200, {
       success: true,
@@ -1172,12 +1213,29 @@ export const handleGetPendingProcurementReceivables = async (req, res) => {
       FROM procurement_orders po
       JOIN products p ON po.product_id = p.id
       LEFT JOIN inventory i ON i.product_id = p.id
-      WHERE po.status IN ('approved', 'in_transit')
-      ORDER BY po.order_date DESC`
+      WHERE po.status IN ('pending', 'approved', 'in_transit', 'delayed')
+         OR (po.status = 'delivered' AND po.updated_at >= DATE_SUB(NOW(), INTERVAL 30 DAY))
+      ORDER BY
+        FIELD(po.status, 'pending', 'approved', 'in_transit', 'delayed', 'delivered'),
+        po.order_date DESC`
     );
 
+    const list = Array.isArray(orders) ? orders : [];
+    const openOrders = list.filter((o) => !['delivered', 'cancelled'].includes(String(o.status || '').toLowerCase()));
+    const completedOrders = list.filter((o) => String(o.status || '').toLowerCase() === 'delivered');
+
     sendJSON(res, 200, {
-      pending_goods: Array.isArray(orders) ? orders : []
+      pending_goods: list,
+      open_orders: openOrders,
+      completed_orders: completedOrders,
+      summary: {
+        open_count: openOrders.length,
+        completed_count: completedOrders.length,
+        open_units: openOrders.reduce((s, o) => s + Number(o.quantity || 0), 0),
+        completed_units: completedOrders.reduce((s, o) => s + Number(o.quantity || 0), 0),
+        open_value: openOrders.reduce((s, o) => s + Number(o.total_cost || 0), 0),
+        completed_value: completedOrders.reduce((s, o) => s + Number(o.total_cost || 0), 0),
+      },
     });
   } catch (error) {
     console.error('Get pending receivables error:', error);

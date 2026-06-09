@@ -8,6 +8,214 @@ import Busboy from 'busboy';
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
 
+let forecastSchemaEnsured = false;
+
+/** Creates forecast_file_uploads and related tables if missing (Manaf1.sql does not include them). */
+export const ensureForecastSchema = async () => {
+  if (forecastSchemaEnsured) return;
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS forecast_results (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      product_id INT NOT NULL,
+      forecast_date DATE NOT NULL,
+      forecasted_demand INT NOT NULL DEFAULT 0,
+      confidence_level DECIMAL(5,4) DEFAULT 0.95,
+      trend_indicator VARCHAR(20) DEFAULT 'stable',
+      seasonality_factor DECIMAL(10,4) DEFAULT 1.0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_forecast_product_date (product_id, forecast_date),
+      KEY idx_forecast_date (forecast_date),
+      KEY idx_product_id (product_id)
+    )
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS forecast_file_uploads (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      file_name VARCHAR(255) NOT NULL,
+      file_format VARCHAR(50) NOT NULL,
+      row_count INT DEFAULT 0,
+      column_count INT DEFAULT 0,
+      status VARCHAR(50) DEFAULT 'uploaded',
+      forecast_count INT DEFAULT 0,
+      error_message TEXT,
+      uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      processed_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      KEY idx_user_id (user_id),
+      KEY idx_status (status),
+      KEY idx_uploaded_at (uploaded_at)
+    )
+  `);
+
+  const dbName = process.env.DB_NAME || 'manufacturing_system';
+  const existingColumns = await query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'forecast_results'`,
+    [dbName]
+  );
+  const columnNames = new Set(existingColumns.map((row) => row.COLUMN_NAME));
+
+  const optionalColumns = [
+    { name: 'unit_price', definition: 'DECIMAL(10,2) DEFAULT 0' },
+    { name: 'confidence', definition: 'DECIMAL(5,4) DEFAULT 0.95' },
+    { name: 'model', definition: "VARCHAR(100) DEFAULT 'ensemble'" },
+    { name: 'source', definition: "VARCHAR(100) DEFAULT 'system'" },
+    { name: 'file_upload_id', definition: 'INT' },
+  ];
+
+  for (const column of optionalColumns) {
+    if (!columnNames.has(column.name)) {
+      await query(`ALTER TABLE forecast_results ADD COLUMN ${column.name} ${column.definition}`);
+    }
+  }
+
+  const uploadColumns = await query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'forecast_file_uploads'`,
+    [dbName]
+  );
+  const uploadColumnNames = new Set(uploadColumns.map((row) => row.COLUMN_NAME));
+  if (!uploadColumnNames.has('payload')) {
+    await query('ALTER TABLE forecast_file_uploads ADD COLUMN payload JSON');
+  }
+
+  forecastSchemaEnsured = true;
+};
+
+const groupForecastDataByProduct = (forecastData) => {
+  const byProduct = {};
+  forecastData.forEach((item) => {
+    const key = item.product_identifier;
+    if (!byProduct[key]) byProduct[key] = [];
+    byProduct[key].push(item);
+  });
+  return byProduct;
+};
+
+const countMatchedProducts = async (productIdentifiers) => {
+  if (!productIdentifiers.length) return { matched: 0, unmatched: 0 };
+
+  const numericIds = productIdentifiers.filter((id) => /^\d+$/.test(String(id))).map(Number);
+  const skuIds = productIdentifiers.map(String);
+  const placeholders = skuIds.map(() => '?').join(',');
+
+  let sql = `SELECT DISTINCT sku FROM products WHERE sku IN (${placeholders})`;
+  const params = [...skuIds];
+  if (numericIds.length) {
+    const idPlaceholders = numericIds.map(() => '?').join(',');
+    sql += ` OR id IN (${idPlaceholders})`;
+    params.push(...numericIds);
+  }
+
+  const rows = await query(sql, params);
+  const matched = rows.length;
+  return { matched, unmatched: productIdentifiers.length - matched };
+};
+
+const generateAndSaveForecastsFromProductMap = async (byProduct, daysAhead = 30, modelType = 'ensemble') => {
+  const productEntries = Object.entries(byProduct);
+  const mlPromises = productEntries.map(async ([productId, items]) => {
+    try {
+      const historicalData = items
+        .map((item) => ({ sale_date: item.date, quantity: item.quantity }))
+        .filter((d) => d.sale_date);
+
+      if (historicalData.length === 0) {
+        return [];
+      }
+
+      const mlResponse = await callMLService('/api/forecast/', 'POST', {
+        product_id: productId,
+        historical_data: historicalData,
+        days_ahead: daysAhead,
+        model_type: modelType,
+      });
+
+      if (mlResponse?.forecasts && Array.isArray(mlResponse.forecasts)) {
+        return mlResponse.forecasts.map((forecast) => ({
+          product_identifier: productId,
+          ...forecast,
+        }));
+      }
+      return [];
+    } catch (productErr) {
+      console.error(`[Forecast Predict] Error for product ${productId}: ${productErr.message}`);
+      return [];
+    }
+  });
+
+  const results = await Promise.allSettled(
+    mlPromises.map((promise) =>
+      Promise.race([
+        promise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Individual ML call timeout')), 60000)
+        ),
+      ])
+    )
+  );
+
+  const allForecasts = [];
+  results.forEach((result) => {
+    if (result.status === 'fulfilled') {
+      allForecasts.push(...result.value);
+    }
+  });
+
+  if (allForecasts.length === 0) {
+    return 0;
+  }
+
+  const uniqueSkus = [...new Set(allForecasts.map((f) => f.product_identifier || f.product_id))];
+  const placeholders = uniqueSkus.map(() => '?').join(',');
+  const numericIds = uniqueSkus.filter((id) => /^\d+$/.test(String(id))).map(Number);
+  let productSql = `SELECT id, sku FROM products WHERE sku IN (${placeholders})`;
+  const productParams = [...uniqueSkus];
+  if (numericIds.length) {
+    productSql += ` OR id IN (${numericIds.map(() => '?').join(',')})`;
+    productParams.push(...numericIds);
+  }
+  const productRows = await query(productSql, productParams);
+
+  const skuToIdMap = {};
+  productRows.forEach((p) => {
+    skuToIdMap[p.sku] = p.id;
+    skuToIdMap[String(p.id)] = p.id;
+  });
+
+  const insertValues = [];
+  const insertParams = [];
+
+  allForecasts.forEach((forecast) => {
+    const skuIdentifier = forecast.product_identifier || forecast.product_id;
+    const forecastDate = forecast.date || forecast.forecast_date;
+    const forecastedDemand = forecast.demand ?? forecast.forecasted_demand;
+
+    if (!forecastDate || forecastedDemand === undefined) return;
+
+    const dbProductId = skuToIdMap[skuIdentifier];
+    if (!dbProductId) return;
+
+    insertValues.push('(?, ?, ?)');
+    insertParams.push(dbProductId, forecastDate, forecastedDemand);
+  });
+
+  if (insertValues.length > 0) {
+    await query(
+      `INSERT INTO forecast_results (product_id, forecast_date, forecasted_demand)
+       VALUES ${insertValues.join(',')}
+       ON DUPLICATE KEY UPDATE forecasted_demand = VALUES(forecasted_demand)`,
+      insertParams
+    );
+  }
+
+  return insertValues.length;
+};
+
 const callMLService = (endpoint, method = 'GET', data = null) => {
   return new Promise((resolve, reject) => {
     const url = new URL(`${ML_SERVICE_URL}${endpoint}`);
@@ -395,7 +603,17 @@ export const handleGetInventoryRecommendations = async (req, res) => {
       FROM inventory_recommendations ir
       JOIN products p ON ir.product_id = p.id
       JOIN inventory i ON ir.product_id = i.product_id
-      WHERE 1=1
+      WHERE COALESCE(i.available_stock, i.current_stock, 0) < COALESCE(p.reorder_point, 999999)
+        AND ir.risk_type != 'overstock'
+        AND (
+          COALESCE(ir.optimal_order_quantity, 0) > 0
+          OR COALESCE(i.available_stock, i.current_stock, 0) < COALESCE(p.reorder_point, 0)
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM procurement_orders po
+          WHERE po.product_id = ir.product_id
+            AND po.status IN ('pending', 'approved', 'in_transit', 'delayed')
+        )
     `;
     const params = [];
 
@@ -443,6 +661,13 @@ export const handleGenerateRecommendations = async (req, res) => {
  * Validates file structure and generates forecast from uploaded data
  */
 export const handleUploadForecastData = async (req, res) => {
+  try {
+    await ensureForecastSchema();
+  } catch (error) {
+    console.error('Forecast schema init error:', error);
+    return sendError(res, 500, `Failed to initialize forecast tables: ${error.message}`);
+  }
+
   let fileBuffer = Buffer.alloc(0);
   let fileName = '';
 
@@ -486,241 +711,15 @@ export const handleUploadForecastData = async (req, res) => {
       );
 
       const fileUploadId = fileRecord.insertId;
+      const byProduct = groupForecastDataByProduct(forecastData);
+      const productIdentifiers = Object.keys(byProduct);
+      const { matched, unmatched } = await countMatchedProducts(productIdentifiers);
 
-      // Group data by product and date for aggregation
-      const productMap = new Map();
-      console.log(`[Forecast Upload] Starting forEach on forecastData, length: ${forecastData.length}`);
-      
-      try {
-        forecastData.forEach(item => {
-          const key = item.product_identifier;
-          if (!productMap.has(key)) {
-            productMap.set(key, []);
-          }
-          productMap.get(key).push(item);
-        });
-      } catch (forEachErr) {
-        console.error(`[Forecast Upload] Error in forEach: ${forEachErr.message}`, forEachErr);
-        throw forEachErr;
-      }
-      
-      console.log(`[Forecast Upload] Grouped into ${productMap.size} unique products`);
-
-      // AUTO-GENERATE PRODUCTION AND PROCUREMENT PLANS IMMEDIATELY FROM UPLOADED DATA
-      console.log(`[Forecast Upload] Creating production and procurement plans from uploaded data...`);
-      try {
-        for (const [productSku, items] of productMap.entries()) {
-          try {
-            const totalQuantity = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
-            
-            if (totalQuantity <= 0) {
-              console.log(`[Forecast Upload] Skipping production plan for ${productSku} - zero quantity`);
-              continue;
-            }
-
-            // Find product in database to get ID and name
-            const productInfo = await query('SELECT id, name FROM products WHERE id = ? OR sku = ? LIMIT 1', [productSku, productSku]);
-            if (productInfo.length === 0) {
-              console.log(`[Forecast Upload] Product not found for SKU/ID: ${productSku}`);
-              continue;
-            }
-            
-            const productId = productInfo[0].id;
-            const productName = productInfo[0].name;
-
-            // Create production plan
-            const ppResult = await query(`
-              INSERT INTO production_plans (product_id, target_quantity, start_date, end_date, priority, notes, created_by)
-              VALUES (?, ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), ?, ?, ?)
-            `, [
-              productId,
-              Math.ceil(totalQuantity),
-              'medium',
-              `Auto-generated from file upload (${Math.ceil(totalQuantity)} units)`,
-              req.user.id
-            ]);
-
-            console.log(`[Forecast Upload] Created production plan ${ppResult.insertId} for ${productName} (${totalQuantity} units)`);
-
-            // Create procurement order
-            const unit_cost = 100;
-            const total_cost = Math.ceil(totalQuantity) * unit_cost;
-            
-            const poResult = await query(`
-              INSERT INTO procurement_orders (product_id, supplier_name, quantity, unit_cost, total_cost, order_date, expected_delivery, notes, created_by)
-              VALUES (?, ?, ?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 7 DAY), ?, ?)
-            `, [
-              productId,
-              'Auto-Supplier',
-              Math.ceil(totalQuantity),
-              unit_cost,
-              total_cost,
-              `Auto-generated procurement (${Math.ceil(totalQuantity)} units)`,
-              req.user.id
-            ]);
-
-            console.log(`[Forecast Upload] Created procurement order ${poResult.insertId} for ${productName}`);
-          } catch (planErr) {
-            console.error(`[Forecast Upload] Error creating plans for ${productSku}: ${planErr.message}`);
-          }
-        }
-      } catch (autoGenErr) {
-        console.error(`[Forecast Upload] Error in auto-generation: ${autoGenErr.message}`);
-      }
-
-      // Emit Socket.io update for production/procurement data
-      if (global.io) {
-        console.log(`[Forecast Upload] Emitting operations data update...`);
-        global.io.emit('app:operations-data-updated', {
-          source: 'file_upload',
-          fileId: fileUploadId,
-          timestamp: new Date()
-        });
-      }
-
-      // Prepare historical data for each product and call ML service in parallel
-      const allForecasts = [];
-      
-      // Create array of ML service promises for parallel execution
-      const mlPromises = Array.from(productMap.entries()).map(async ([productId, items]) => {
-        try {
-          console.log(`[Forecast Upload] Processing forecasts for product: ${productId} (${items.length} records)`);
-          
-          // Transform items to historical_data format expected by ML service
-          const historicalData = items.map(item => ({
-            sale_date: item.date,
-            quantity: item.quantity
-          })).filter(d => d.sale_date); // Only include records with dates
-
-          if (historicalData.length === 0) {
-            console.log(`[Forecast Upload] Skipping ${productId} - no valid date records`);
-            return [];
-          }
-
-          // Call ML service for this product
-          const mlResponse = await callMLService('/api/forecast/', 'POST', {
-            product_id: productId,
-            historical_data: historicalData,
-            days_ahead: 30,
-            model_type: 'ensemble'
-          });
-
-          console.log(`[Forecast Upload] ML service returned forecasts for ${productId}: ${mlResponse?.forecasts?.length || 0}`);
-          
-          // Return forecasts with product identifier attached
-          if (mlResponse && mlResponse.forecasts && Array.isArray(mlResponse.forecasts)) {
-            return mlResponse.forecasts.map(forecast => ({
-              product_identifier: productId,
-              ...forecast
-            }));
-          }
-          return [];
-        } catch (productErr) {
-          console.error(`[Forecast Upload] Error processing product ${productId}: ${productErr.message}`);
-          return [];
-        }
-      });
-
-      // Wait for all ML service calls to complete in parallel (with individual timeouts)
-      console.log(`[Forecast Upload] Making ${mlPromises.length} parallel ML service calls...`);
-      
-      // Use allSettled to wait for all promises, whether they succeed or fail
-      const results = await Promise.allSettled(
-        mlPromises.map(promise => 
-          Promise.race([
-            promise,
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Individual ML call timeout')), 60000)
-            )
-          ])
-        )
-      );
-      
-      // Process all successful results
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          allForecasts.push(...result.value);
-        } else {
-          console.warn(`[Forecast Upload] ML call ${index} failed or timed out: ${result.reason?.message || 'Unknown error'}`);
-        }
-      });
-      
-      console.log(`[Forecast Upload] Completed ML service calls. Got ${allForecasts.length} forecasts total.`);
-
-      // Store forecasts from uploaded data with optimized batch insert
-      if (allForecasts.length > 0) {
-        console.log(`[Forecast Upload] Starting batch insert of ${allForecasts.length} forecasts...`);
-        
-        try {
-          // Get unique SKUs first
-          const uniqueSkus = [...new Set(allForecasts.map(f => f.product_identifier || f.product_id))];
-          console.log(`[Forecast Upload] Found ${uniqueSkus.length} unique products from ${allForecasts.length} forecasts`);
-          
-          // Get all product SKU->ID mappings in one query (MUCH faster than individual lookups)
-          const placeholders = uniqueSkus.map(() => '?').join(',');
-          const productMap = await query(
-            `SELECT id, sku FROM products WHERE sku IN (${placeholders})`,
-            uniqueSkus
-          );
-          
-          const skuToIdMap = {};
-          productMap.forEach(p => {
-            skuToIdMap[p.sku] = p.id;
-          });
-          console.log(`[Forecast Upload] Loaded product mappings for ${Object.keys(skuToIdMap).length} products`);
-
-          // Build batch insert values
-          const insertValues = [];
-          const insertParams = [];
-          let skippedCount = 0;
-
-          allForecasts.forEach(forecast => {
-            const skuIdentifier = forecast.product_identifier || forecast.product_id;
-            const forecastDate = forecast.date || forecast.forecast_date;
-            const forecastedDemand = forecast.demand || forecast.forecasted_demand;
-            
-            if (!forecastDate || forecastedDemand === undefined) {
-              console.warn(`[Forecast Upload] Skipping forecast for ${skuIdentifier} - missing date or demand`);
-              skippedCount++;
-              return;
-            }
-
-            const productId = skuToIdMap[skuIdentifier];
-            if (!productId) {
-              console.warn(`[Forecast Upload] Product not found for SKU: ${skuIdentifier}`);
-              skippedCount++;
-              return;
-            }
-
-            insertValues.push('(?, ?, ?)');
-            insertParams.push(productId, forecastDate, forecastedDemand);
-          });
-
-          if (insertValues.length > 0) {
-            console.log(`[Forecast Upload] Inserting ${insertValues.length} forecasts (skipped ${skippedCount})...`);
-            const sql = `INSERT INTO forecast_results (product_id, forecast_date, forecasted_demand) 
-                         VALUES ${insertValues.join(',')}
-                         ON DUPLICATE KEY UPDATE forecasted_demand = VALUES(forecasted_demand)`;
-            
-            await query(sql, insertParams);
-            console.log(`[Forecast Upload] Batch insert completed successfully!`);
-          }
-        } catch (batchErr) {
-          console.error(`[Forecast Upload] Batch insert error: ${batchErr.message}`);
-          throw batchErr;
-        }
-      }
-
-      // Update file status
-      console.log(`[Forecast Upload] Updating file status to 'processed'...`);
       await query(
-        `UPDATE forecast_file_uploads SET status = 'processed', processed_at = NOW(), forecast_count = ? WHERE id = ?`,
-        [allForecasts.length, fileUploadId]
+        `UPDATE forecast_file_uploads SET payload = ? WHERE id = ?`,
+        [JSON.stringify({ byProduct }), fileUploadId]
       );
-      console.log(`[Forecast Upload] File status updated.`);
 
-      // Log audit
-      console.log(`[Forecast Upload] Logging audit event...`);
       await logAudit(
         req.user.id,
         'UPLOAD_FORECAST_DATA',
@@ -730,37 +729,27 @@ export const handleUploadForecastData = async (req, res) => {
           fileName,
           rowCount: parsed.rowCount,
           columnCount: parsed.columnCount,
-          forecastsGenerated: allForecasts.length
+          productCount: productIdentifiers.length,
+          matchedProducts: matched,
+          unmatchedProducts: unmatched,
         },
         req
       );
-      console.log(`[Forecast Upload] Audit logged.`);
 
-      // Trigger refresh event
-      if (global.io) {
-        console.log(`[Forecast Upload] Emitting Socket.io event...`);
-        global.io.emit('app:forecasts-updated', {
-          source: 'file_upload',
-          fileId: fileUploadId,
-          timestamp: new Date(),
-          forecastCount: allForecasts.length
-        });
-        console.log(`[Forecast Upload] Socket.io event emitted.`);
-      }
-
-      console.log(`[Forecast Upload] Sending success response with ${allForecasts.length} forecasts...`);
       sendJSON(res, 200, {
         success: true,
-        message: `File processed successfully. Generated ${allForecasts.length} forecasts.`,
+        message: 'File uploaded successfully. Click "Run Predict 2 (Demand)" to generate forecasts.',
         fileUploadId,
+        readyForPrediction: true,
         fileInfo: {
           fileName,
           format: parsed.format,
           rowCount: parsed.rowCount,
-          columnCount: parsed.columnCount
+          columnCount: parsed.columnCount,
         },
-        forecastsGenerated: allForecasts.length,
-        forecasts: allForecasts.slice(0, 10) // Return first 10 for preview
+        productCount: productIdentifiers.length,
+        matchedProducts: matched,
+        unmatchedProducts: unmatched,
       });
     } catch (error) {
       console.error('Upload forecast data error:', error);
@@ -776,9 +765,87 @@ export const handleUploadForecastData = async (req, res) => {
   req.pipe(bb);
 };
 
+/** Run ML predictions from a previously uploaded file (does not create products). */
+export const handlePredictFromUpload = async (req, res) => {
+  try {
+    await ensureForecastSchema();
+    const body = await parseBody(req);
+    const { file_upload_id, days_ahead = 30, model_type = 'ensemble' } = body;
+
+    if (!file_upload_id) {
+      return sendError(res, 400, 'file_upload_id is required');
+    }
+
+    const uploads = await query(
+      `SELECT id, file_name, payload, status FROM forecast_file_uploads WHERE id = ?`,
+      [file_upload_id]
+    );
+
+    if (!uploads.length) {
+      return sendError(res, 404, 'Upload not found');
+    }
+
+    const upload = uploads[0];
+    if (!upload.payload) {
+      return sendError(res, 400, 'Upload has no staged data. Please upload the file again.');
+    }
+
+    const staged = typeof upload.payload === 'string' ? JSON.parse(upload.payload) : upload.payload;
+    const byProduct = staged?.byProduct || {};
+    const productCount = Object.keys(byProduct).length;
+
+    if (productCount === 0) {
+      return sendError(res, 400, 'No product data found in upload');
+    }
+
+    console.log(`[Forecast Predict] Running predictions for upload ${file_upload_id} (${productCount} products)...`);
+    const forecastsSaved = await generateAndSaveForecastsFromProductMap(byProduct, days_ahead, model_type);
+
+    await query(
+      `UPDATE forecast_file_uploads SET status = 'processed', processed_at = NOW(), forecast_count = ? WHERE id = ?`,
+      [forecastsSaved, file_upload_id]
+    );
+
+    await logAudit(
+      req.user.id,
+      'PREDICT_FROM_UPLOAD',
+      'forecast_file',
+      file_upload_id,
+      { fileName: upload.file_name, forecastsSaved, days_ahead, model_type },
+      req
+    );
+
+    try {
+      await recalculateAndPersistKPIs(30);
+    } catch (kpiError) {
+      console.warn('Recalculate KPIs after upload prediction failed:', kpiError);
+    }
+
+    if (global.io) {
+      global.io.emit('app:forecasts-updated', {
+        source: 'file_upload_predict',
+        fileId: file_upload_id,
+        timestamp: new Date(),
+        forecastCount: forecastsSaved,
+      });
+    }
+
+    sendJSON(res, 200, {
+      success: true,
+      message: `Generated ${forecastsSaved} forecasts from uploaded file.`,
+      fileUploadId: file_upload_id,
+      forecastsGenerated: forecastsSaved,
+    });
+  } catch (error) {
+    console.error('Predict from upload error:', error);
+    sendError(res, 500, `Failed to generate predictions: ${error.message}`);
+  }
+};
+
 // Clear all forecast data (for fresh start before new upload)
 export const handleClearForecasts = async (req, res) => {
   try {
+    await ensureForecastSchema();
     console.log(`[Forecast Clear] Clearing ALL system data for fresh prediction start...`);
     
     // Delete all operational data for clean prediction restart

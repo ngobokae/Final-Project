@@ -54,7 +54,7 @@ export default function ExecutiveSidebar() {
     {
       title: 'Operations & Reports',
       items: [
-        { to: '/executive/procurement-approvals', icon: ShoppingCart, label: 'Approvals', badge: null },
+        { to: '/executive/procurement-approvals', icon: ShoppingCart, label: 'Order Monitor', badge: null },
         { to: '/executive/reports', icon: FileText, label: 'Reports', badge: null },
         { to: '/executive/simulator', icon: Calculator, label: 'ROI Simulator', badge: null }
       ]

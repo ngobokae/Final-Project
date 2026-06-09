@@ -26,32 +26,22 @@ export default function ProcurementPlan() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [supplierAnalytics, setSupplierAnalytics] = useState([]);
   const [costTrends, setCostTrends] = useState([]);
-  const [recommendations, setRecommendations] = useState([]);
-  const [autoRecommendationsChecked, setAutoRecommendationsChecked] = useState(false);
-  const [generatingRecs, setGeneratingRecs] = useState(false);
+  const [recByProduct, setRecByProduct] = useState({});
   const [statusUpdating, setStatusUpdating] = useState({});
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [creatingOrder, setCreatingOrder] = useState(false);
-  const [newOrder, setNewOrder] = useState({
-    product_id: '',
-    supplier_name: 'Kinglion Rwanda Supplier',
-    quantity: 100,
-    unit_cost: 0,
-    expected_delivery: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    notes: ''
-  });
-  const [products, setProducts] = useState([]);
-
-  const fetchProducts = async () => {
-    try {
-      const data = await apiGet('/api/products?limit=100');
-      setProducts(data.products || []);
-    } catch (e) {
-      console.error('Fetch products failed', e);
-    }
-  };
 
   const handleDownloadPO = (order) => {
+    const st = String(order?.status || '').toLowerCase();
+    if (!['approved', 'in_transit', 'delivered'].includes(st)) {
+      window.dispatchEvent(new CustomEvent('app:toast', {
+        detail: {
+          type: 'error',
+          title: 'PO Not Available',
+          description: 'Digital PO can only be generated after Operations approves the order.'
+        }
+      }));
+      return;
+    }
+
     const doc = new jsPDF();
     
     // Add Header / Brand
@@ -132,22 +122,18 @@ export default function ProcurementPlan() {
     if (!ok) return;
 
     try {
-      // Call inventory endpoint to receive procurement goods
       await apiPost('/api/inventory/receive-procurement', {
         procurement_order_id: order.id,
         auto_confirm: true
       });
       
-      // Update procurement status to delivered
-      await handleUpdateOrderStatus(order.id, 'delivered');
-      
       window.dispatchEvent(new CustomEvent('app:toast', { 
-        detail: { type: 'success', title: 'Goods Received', description: 'Inventory stock has been increased and audit trail recorded.' } 
+        detail: { type: 'success', title: 'Goods Received', description: 'Inventory stock has been increased and recorded in Stock Transactions.' } 
       }));
       
-      // Dispatch events for cross-module updates
       window.dispatchEvent(new Event('app:operations-data-updated'));
       window.dispatchEvent(new Event('app:notifications-changed'));
+      await fetchData();
     } catch (error) {
       console.error('Failed to receive goods:', error);
       window.dispatchEvent(new CustomEvent('app:toast', { 
@@ -156,79 +142,12 @@ export default function ProcurementPlan() {
     }
   };
 
-  const handleCreateOrder = async (e) => {
-    if (e) e.preventDefault();
-    setCreatingOrder(true);
-    try {
-      await apiPost('/api/procurement', newOrder);
-      setShowAddModal(false);
-      fetchData();
-      window.dispatchEvent(new CustomEvent('app:toast', { 
-        detail: { type: 'success', title: 'Order Created', description: 'Procurement order has been placed successfully.' } 
-      }));
-    } catch (error) {
-      console.error('Failed to create procurement order:', error);
-      alert('Failed to create order: ' + (error.message || 'Unknown error'));
-    } finally {
-      setCreatingOrder(false);
-    }
-  };
-
-  const handleCreateOrderFromRecommendation = async (rec) => {
-    const ok = await confirm(`Create a procurement order for ${rec.recommended_qty} units of ${rec.product_name}?`, {
-      title: 'Confirm AI Recommendation',
-      confirmText: 'Create Order',
-    });
-    if (!ok) return;
-
-    try {
-      setCreatingOrder(true);
-      const payload = {
-        product_id: rec.product_id,
-        supplier_name: rec.supplier || 'AI Recommended Supplier',
-        quantity: rec.recommended_qty,
-        unit_cost: rec.unit_cost || 0,
-        expected_delivery: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        notes: `AI Suggestion Engine: ${rec.reasoning}`
-      };
-      
-      const result = await apiPost('/api/procurement', payload);
-      
-      window.dispatchEvent(new CustomEvent('app:toast', { 
-        detail: { 
-          type: 'success', 
-          title: 'Procurement Order Created', 
-          description: `Successfully created order for ${rec.product_name} (${rec.recommended_qty} units).` 
-        } 
-      }));
-      
-      window.dispatchEvent(new Event('app:operations-data-updated'));
-      await fetchData();
-    } catch (error) {
-      console.error('Failed to create order from recommendation:', error);
-      window.dispatchEvent(new CustomEvent('app:toast', { 
-        detail: { 
-          type: 'error', 
-          title: 'Failed to Create Order', 
-          description: error?.message || 'Unable to create procurement order. Please try again.' 
-        } 
-      }));
-    } finally {
-      setCreatingOrder(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
   useEffect(() => {
     fetchData();
   }, []);
 
   useEffect(() => {
     const onUpdate = () => {
-      setAutoRecommendationsChecked(false);
       fetchData();
     };
     window.addEventListener('app:forecasts-updated', onUpdate);
@@ -291,13 +210,12 @@ export default function ProcurementPlan() {
     try {
       setLoading(true);
       setError(null);
-      const [ordersData, statsData, analyticsData, trendsData, recsData, forecastsData] = await Promise.all([
+      const [ordersData, statsData, analyticsData, trendsData, recsData] = await Promise.all([
         apiGet('/api/procurement').catch((e) => { console.warn('Procurement orders:', e); return []; }),
         apiGet('/api/procurement/stats').catch((e) => { console.warn('Procurement stats:', e); return { total_orders: 0, total_value: 0, delivered: 0, pending: 0, delayed: 0 }; }),
         apiGet('/api/procurement/analytics').catch((e) => { console.warn('Procurement analytics:', e); return []; }),
         apiGet('/api/procurement/trends').catch((e) => { console.warn('Procurement trends:', e); return []; }),
-        apiGet('/api/forecast/recommendations').catch((e) => { console.warn('Recommendations:', e); return { recommendations: [] }; }),
-        apiGet('/api/forecast?days=90').catch((e) => { console.warn('Forecasts:', e); return { forecasts: [] }; })
+        apiGet('/api/forecast/recommendations').catch((e) => { console.warn('Recommendations:', e); return { recommendations: [] }; })
       ]);
       
       setOrders(Array.isArray(ordersData) ? ordersData : (ordersData?.data || []));
@@ -305,85 +223,12 @@ export default function ProcurementPlan() {
       setSupplierAnalytics(Array.isArray(analyticsData) ? analyticsData : (analyticsData?.data || []));
       setCostTrends(Array.isArray(trendsData) ? trendsData : (trendsData?.data || []));
       
-      // Convert inventory recommendations to procurement recommendations format
-      let recs = (recsData.recommendations || []).slice(0, 20).map((rec, idx) => ({
-        id: idx + 1,
-        product_id: rec.product_id,
-        product_name: rec.product_name || 'Product',
-        sku: rec.sku || 'N/A',
-        supplier: 'Auto-generated supplier',
-        current_stock: rec.current_stock || rec.available_stock || 0,
-        recommended_qty: rec.optimal_order_quantity || 0,
-        unit_cost: rec.unit_cost || 1,
-        savings: rec.risk_level === 'critical' ? 15 : rec.risk_level === 'high' ? 10 : 5,
-        reasoning: rec.reasoning || 'Based on inventory optimization analysis',
-        priority: rec.risk_level === 'critical' ? 'high' : rec.risk_level === 'high' ? 'medium' : 'low',
-        action: 'Create Order'
-      }));
-      const forecastsList = Array.isArray(forecastsData.forecasts) ? forecastsData.forecasts : [];
-      
-      // If no inventory recommendations exist yet, derive simple forecast-based suggestions on the fly
-      if (recs.length === 0 && forecastsList.length > 0) {
-        const byProduct = new Map();
-        forecastsList.forEach((f) => {
-          if (!f.product_id) return;
-          const key = f.product_id;
-          const demand = Number(f.forecasted_demand) || 0;
-          const unitCost = Number(f.unit_cost || f.unit_price) || 1;
-          const existing =
-            byProduct.get(key) || {
-              product_id: f.product_id,
-              product_name: f.product_name || `Product ${f.product_id}`,
-              sku: f.sku || 'N/A',
-              current_stock: 0,
-              recommended_qty: 0,
-              unit_cost: unitCost,
-            };
-          existing.recommended_qty += demand;
-          byProduct.set(key, existing);
-        });
-
-        recs = Array.from(byProduct.values()).slice(0, 20).map((rec, idx) => ({
-          id: idx + 1,
-          product_id: rec.product_id,
-          product_name: rec.product_name,
-          sku: rec.sku,
-          supplier: 'Forecast-based supplier',
-          current_stock: rec.current_stock || 0,
-          recommended_qty: Math.round(rec.recommended_qty),
-          unit_cost: rec.unit_cost || 1,
-          savings: 5,
-          reasoning: 'Derived directly from forecasted demand',
-          priority: 'medium',
-          action: 'Create Order',
-        }));
+      const recMap = {};
+      for (const rec of recsData.recommendations || []) {
+        if (!rec?.product_id) continue;
+        recMap[rec.product_id] = rec;
       }
-
-      setRecommendations(recs);
-      if (recs.length === 0 && forecastsList.length === 0) {
-        setAutoRecommendationsChecked(false);
-      }
-
-      if (!autoRecommendationsChecked && recs.length === 0 && forecastsList.length > 0) {
-        setAutoRecommendationsChecked(true);
-        try {
-          const productIds = [...new Set(forecastsList.map((f) => f.product_id).filter(Boolean))].slice(0, 20);
-          let generated = 0;
-          for (const productId of productIds) {
-            try {
-              await apiPost('/api/forecast/recommendations', { product_id: productId });
-              generated++;
-            } catch (e) {
-              console.warn('Auto recommendation generation failed for product', productId, e);
-            }
-          }
-          if (generated > 0) {
-            window.dispatchEvent(new CustomEvent('app:forecasts-updated'));
-          }
-        } catch (e) {
-          console.warn('Auto-generate recommendations from forecasts failed', e);
-        }
-      }
+      setRecByProduct(recMap);
     } catch (err) {
       console.error('Failed to fetch procurement data:', err);
       setError(err?.message || 'Failed to load procurement data. Check that the backend is running.');
@@ -392,43 +237,13 @@ export default function ProcurementPlan() {
     }
   };
 
-  const handleGenerateAllRecommendations = async () => {
-    setGeneratingRecs(true);
-    try {
-      const response = await apiGet('/api/forecast?days=90').catch(() => ({ forecasts: [] }));
-      const forecastsList = response.forecasts || [];
-      const productIds = [...new Set(forecastsList.map((f) => f.product_id).filter(Boolean))].slice(0, 20);
-      
-      if (productIds.length === 0) {
-        window.dispatchEvent(new CustomEvent('app:toast', { 
-          detail: { type: 'info', title: 'No Forecasts Found', description: 'Please generate demand forecasts under the Forecasting panel first.' } 
-        }));
-        return;
-      }
-      
-      let generated = 0;
-      for (const productId of productIds) {
-        try {
-          await apiPost('/api/forecast/recommendations', { product_id: productId });
-          generated++;
-        } catch (e) {
-          console.warn('Recommendation generation failed for product', productId, e);
-        }
-      }
-      
-      await fetchData();
-      
-      window.dispatchEvent(new CustomEvent('app:toast', { 
-        detail: { type: 'success', title: 'AI Optimization Complete', description: `Successfully generated recommendations for ${generated} products.` } 
-      }));
-    } catch (e) {
-      console.error(e);
-      window.dispatchEvent(new CustomEvent('app:toast', { 
-        detail: { type: 'error', title: 'AI Optimization Failed', description: e.message || 'Error occurred during optimization.' } 
-      }));
-    } finally {
-      setGeneratingRecs(false);
-    }
+  const getPredictionForOrder = (order) => {
+    const rec = recByProduct[order?.product_id];
+    if (!rec) return { suggestedQty: null, reasoning: 'No forecast insight for this product yet.' };
+    return {
+      suggestedQty: Number(rec.effective_order_quantity ?? rec.optimal_order_quantity ?? 0),
+      reasoning: rec.reasoning || 'Based on inventory optimization analysis'
+    };
   };
 
   const handleDeleteOrder = async (id) => {
@@ -454,7 +269,8 @@ export default function ProcurementPlan() {
     try {
       await apiPut(`/api/procurement/${orderId}`, { status: nextStatus });
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: nextStatus } : o)));
-      window.dispatchEvent(new CustomEvent('app:operations-data-updated'));
+      window.dispatchEvent(new Event('app:operations-data-updated'));
+      window.dispatchEvent(new Event('app:notifications-changed'));
       await fetchData();
     } catch (e) {
       console.error('Update procurement status failed', e);
@@ -478,14 +294,18 @@ export default function ProcurementPlan() {
 
   const handleCancelProcurement = async (order) => {
     if (!order?.id) return;
-    const ok = await confirm('Cancel this procurement order? It will not go to production.', {
-      title: 'Cancel Procurement Order',
-      confirmText: 'Cancel Order',
+    const ok = await confirm('Decline/cancel this procurement order? It will not proceed and stock will not change.', {
+      title: 'Decline Procurement Order',
+      confirmText: 'Decline Order',
       variant: 'danger',
     });
     if (!ok) return;
     await handleUpdateOrderStatus(order.id, 'cancelled');
   };
+
+  const canApproveOrders = ['admin', 'executive', 'operations', 'operations_manager'].includes(
+    String(user?.role || '').toLowerCase()
+  );
 
   const getStatusBadge = (status) => {
     const styles = {
@@ -520,18 +340,7 @@ export default function ProcurementPlan() {
       }));
     }
 
-    // 2) Otherwise, derive a basic view from AI recommendations
-    if (!recommendations.length) return [];
-    const map = new Map();
-    recommendations.forEach((rec) => {
-      const name = rec.supplier || 'Forecast supplier';
-      const value = (rec.recommended_qty || 0) * (rec.unit_cost || 0);
-      const entry = map.get(name) || { name, orders: 0, value: 0, onTime: 100 };
-      entry.orders += 1;
-      entry.value += value;
-      map.set(name, entry);
-    });
-    return Array.from(map.values());
+    return [];
   })();
 
   if (loading) {
@@ -561,7 +370,7 @@ export default function ProcurementPlan() {
             <Truck className="w-7 h-7 text-emerald-600" />
             Procurement & Logistics Hub
           </h1>
-          <p className="text-gray-500 mt-1">Manage global supply chain and local distribution</p>
+          <p className="text-gray-500 mt-1">Review inventory orders, approve or decline, and manage delivery to production</p>
         </div>
         <button
           type="button"
@@ -652,119 +461,22 @@ export default function ProcurementPlan() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="recommendations" className="space-y-4">
+      <Tabs defaultValue="orders" className="space-y-4">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="recommendations">Recommendations</TabsTrigger>
+          <TabsTrigger value="orders">Purchase Requests</TabsTrigger>
           <TabsTrigger value="supplier">Supplier Analytics</TabsTrigger>
         </TabsList>
 
-        {/* Recommendations Tab */}
-        <TabsContent value="recommendations" className="space-y-4">
+        <TabsContent value="orders" className="space-y-4">
           {renderSupplierReliability()}
-          
-          <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-emerald-50 to-blue-50 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-blue-600" />
-                  AI Procurement Recommendations
-                </h2>
-                <p className="text-sm text-gray-500 mt-1">Machine Learning models optimizing your supply chain based on demand patterns.</p>
-              </div>
-              <Button
-                onClick={handleGenerateAllRecommendations}
-                disabled={generatingRecs}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs font-semibold shadow-lg shadow-emerald-500/20"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${generatingRecs ? 'animate-spin' : ''}`} />
-                {generatingRecs ? 'Optimizing...' : 'Run AI Optimization'}
-              </Button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-neutral-800/50 border-b border-gray-200 dark:border-neutral-600">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Product</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider text-center">Stock Level</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider text-center">AI Recommended Qty</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">AI Reasoning (Explainable AI)</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Priority</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {recommendations.length > 0 ? recommendations.map((rec) => (
-                    <tr key={rec.id} className="hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div>
-                          <div className="font-medium text-gray-900 dark:text-gray-100">{rec.product_name}</div>
-                          <div className="text-xs text-gray-500 font-mono">{rec.sku}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="text-gray-600 font-medium">{rec.current_stock || 0}</span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="text-emerald-600 font-black text-lg">{rec.recommended_qty || 0}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-start gap-2 bg-blue-50/50 p-2 rounded-lg border border-blue-100/50">
-                           <ShieldCheck className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-                           <p className="text-[11px] text-blue-800 leading-tight italic">
-                             "{rec.reasoning || 'Forecasted demand increase detected based on seasonal trends and current stock velocity.'}"
-                           </p>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <Badge className={rec.priority === 'high' ? 'bg-red-100 text-red-800' : rec.priority === 'medium' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'}>
-                          {String(rec.priority || 'medium').toUpperCase()}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-4">
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="bg-emerald-600 text-white hover:bg-emerald-700 border-none shadow-sm"
-                          onClick={() => handleCreateOrderFromRecommendation(rec)}
-                        >
-                          Generate PO
-                        </Button>
-                      </td>
-                    </tr>
-                  )) : (
-                    <tr>
-                      <td colSpan="6" className="px-6 py-16 text-center text-gray-500 dark:text-gray-400">
-                        <div className="flex flex-col items-center gap-4 max-w-sm mx-auto">
-                          <Activity className="w-12 h-12 text-blue-400/80 animate-pulse" />
-                          <div>
-                            <p className="font-semibold text-gray-800 dark:text-gray-200">No active recommendations found</p>
-                            <p className="text-xs text-gray-500 mt-1">Run AI Optimization to analyze historical sales data, forecast trends, and calculate optimal restock levels.</p>
-                          </div>
-                          <Button 
-                            onClick={handleGenerateAllRecommendations}
-                            disabled={generatingRecs}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs font-semibold shadow-sm"
-                          >
-                            <Zap className="w-3.5 h-3.5" />
-                            {generatingRecs ? 'Orchestrating...' : 'Generate AI Suggestions'}
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
 
           {/* Procurement Orders Table */}
           <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Procurement Orders</h2>
-              <Button onClick={() => setShowAddModal(true)} className="bg-emerald-600 hover:bg-emerald-700">
-                + New Order
-              </Button>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Inventory Purchase Requests</h2>
+                <p className="text-xs text-gray-500 mt-1">Orders are created by Inventory. Operations approves, issues Digital PO, and tracks delivery.</p>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -773,7 +485,9 @@ export default function ProcurementPlan() {
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Product</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Stock</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Ordered Units</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider text-center">AI Suggested</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Prediction Outcome</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Cost</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Timeline / Status</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Workflow Step</th>
@@ -783,6 +497,7 @@ export default function ProcurementPlan() {
                 <tbody className="divide-y divide-gray-200">
                   {filteredOrders.length > 0 ? filteredOrders.map((order) => {
                     const stockStatus = order.available_stock <= (order.safety_stock || 0) ? 'shortage' : order.available_stock < (order.reorder_point || 0) ? 'reorder' : 'normal';
+                    const prediction = getPredictionForOrder(order);
                     return (
                       <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors">
                         <td className="px-6 py-4">
@@ -802,7 +517,16 @@ export default function ProcurementPlan() {
                           <span className="text-gray-600">{order.supplier_name || 'N/A'}</span>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="text-gray-900 dark:text-gray-100">{order.quantity}</span>
+                          <span className="text-gray-900 dark:text-gray-100 font-semibold">{order.quantity}</span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="text-emerald-600 font-bold">{prediction.suggestedQty ?? '—'}</span>
+                        </td>
+                        <td className="px-6 py-4 max-w-xs">
+                          <div className="flex items-start gap-2 bg-blue-50/50 p-2 rounded-lg border border-blue-100/50">
+                            <ShieldCheck className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                            <p className="text-[11px] text-blue-800 leading-tight italic">&quot;{prediction.reasoning}&quot;</p>
+                          </div>
                         </td>
                         <td className="px-6 py-4">
                           <span className="text-gray-900 dark:text-gray-100 font-medium">{formatCurrency(order.total_cost || 0)}</span>
@@ -837,10 +561,14 @@ export default function ProcurementPlan() {
                              {String(order.status || '').toLowerCase() === 'delivered' && (
                                <Badge className="bg-emerald-100 text-emerald-700">4. Received & Stored</Badge>
                              )}
+                             {String(order.status || '').toLowerCase() === 'cancelled' && (
+                               <Badge className="bg-red-100 text-red-700">Declined</Badge>
+                             )}
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {['approved', 'in_transit', 'delivered'].includes(String(order.status || '').toLowerCase()) && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -850,21 +578,33 @@ export default function ProcurementPlan() {
                             >
                               Digital PO
                             </Button>
-                            
-                            {String(order.status || '').toLowerCase() === 'pending' && (user?.role === 'executive' || user?.role === 'operations_manager') && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="bg-emerald-600 text-white hover:bg-emerald-700 border-none"
-                                  onClick={() => handleUpdateOrderStatus(order.id, 'approved')}
-                                >
-                                  Approve Order
-                                </Button>
+                            )}
+                            {String(order.status || '').toLowerCase() === 'pending' && canApproveOrders && (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="bg-emerald-600 text-white hover:bg-emerald-700 border-none"
+                                    disabled={Boolean(statusUpdating[order.id])}
+                                    onClick={() => handleUpdateOrderStatus(order.id, 'approved')}
+                                  >
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-red-600 border-red-200 hover:bg-red-50"
+                                    disabled={Boolean(statusUpdating[order.id])}
+                                    onClick={() => handleCancelProcurement(order)}
+                                  >
+                                    Decline
+                                  </Button>
+                                </>
                             )}
 
-                            {String(order.status || '').toLowerCase() === 'pending' && user?.role !== 'executive' && (
+                            {String(order.status || '').toLowerCase() === 'pending' && !canApproveOrders && (
                                 <Badge variant="outline" className="text-amber-600 border-amber-200">
-                                  Waiting for Executive
+                                  Awaiting Operations Approval
                                 </Badge>
                             )}
                             
@@ -912,7 +652,7 @@ export default function ProcurementPlan() {
                     );
                   }) : (
                     <tr>
-                      <td colSpan="8" className="px-6 py-8 text-center text-gray-500">
+                      <td colSpan="10" className="px-6 py-8 text-center text-gray-500">
                         No procurement orders found
                       </td>
                     </tr>
@@ -955,110 +695,6 @@ export default function ProcurementPlan() {
           </div>
         </TabsContent>
       </Tabs>
-
-      {/* Add Order Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-in fade-in transition-all">
-          <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-gray-200 dark:border-neutral-800">
-            <div className="bg-emerald-600 px-6 py-4">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <ShoppingCart className="w-6 h-6" />
-                Place New Procurement Order
-              </h3>
-            </div>
-            
-            <form onSubmit={handleCreateOrder} className="p-6 space-y-4">
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product</label>
-                  <select
-                    required
-                    className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2"
-                    value={newOrder.product_id}
-                    onChange={(e) => setNewOrder({ ...newOrder, product_id: e.target.value })}
-                  >
-                    <option value="">Select a product...</option>
-                    {products.map(p => (
-                      <option key={p.id} value={p.id}>{p.sku} - {p.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Supplier Name</label>
-                  <Input
-                    required
-                    placeholder="e.g. Kinglion Main Supplier"
-                    value={newOrder.supplier_name}
-                    onChange={(e) => setNewOrder({ ...newOrder, supplier_name: e.target.value })}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quantity</label>
-                    <Input
-                      type="number"
-                      required
-                      min="1"
-                      value={newOrder.quantity}
-                      onChange={(e) => setNewOrder({ ...newOrder, quantity: parseInt(e.target.value) })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Unit Cost</label>
-                    <Input
-                      type="number"
-                      required
-                      min="0"
-                      step="0.01"
-                      value={newOrder.unit_cost}
-                      onChange={(e) => setNewOrder({ ...newOrder, unit_cost: parseFloat(e.target.value) })}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Expected Delivery</label>
-                  <Input
-                    type="date"
-                    required
-                    value={newOrder.expected_delivery}
-                    onChange={(e) => setNewOrder({ ...newOrder, expected_delivery: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes (Optional)</label>
-                  <textarea
-                    className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 h-20"
-                    placeholder="Add any specific instructions..."
-                    value={newOrder.notes}
-                    onChange={(e) => setNewOrder({ ...newOrder, notes: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4 justify-end">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setShowAddModal(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={creatingOrder}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[120px]"
-                >
-                  {creatingOrder ? 'Creating...' : 'Place Order'}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

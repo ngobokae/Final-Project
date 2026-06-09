@@ -8,6 +8,7 @@ import * as productRoutes from './routes/products.js';
 import * as salesRoutes from './routes/sales.js';
 import * as inventoryRoutes from './routes/inventory.js';
 import * as forecastRoutes from './routes/forecast.js';
+const { ensureForecastSchema } = forecastRoutes;
 import * as dashboardRoutes from './routes/dashboard.js';
 import * as auditRoutes from './routes/audit.js';
 import * as productionRoutes from './routes/production.js';
@@ -92,6 +93,7 @@ const routes = {
   'GET /api/forecast/recommendations': { handler: forecastRoutes.handleGetInventoryRecommendations, auth: true, permission: { resource: 'forecasts', action: 'view' } },
   'POST /api/forecast/recommendations': { handler: forecastRoutes.handleGenerateRecommendations, auth: true, roles: ['admin', 'inventory', 'executive', 'operations_manager'], permission: { resource: 'forecasts', action: 'create' } },
   'POST /api/forecast/upload-data': { handler: forecastRoutes.handleUploadForecastData, auth: true, roles: ['admin', 'operations', 'operations_manager'], permission: { resource: 'forecasts', action: 'create' } },
+  'POST /api/forecast/predict-upload': { handler: forecastRoutes.handlePredictFromUpload, auth: true, roles: ['admin', 'operations', 'operations_manager'], permission: { resource: 'forecasts', action: 'create' } },
   'POST /api/forecast/clear': { handler: forecastRoutes.handleClearForecasts, auth: true, roles: ['admin', 'operations', 'operations_manager'], permission: { resource: 'forecasts', action: 'delete' } },
 
   // Demand models (shared)
@@ -134,7 +136,7 @@ const routes = {
   'GET /api/procurement/trends': { handler: procurementRoutes.handleGetProcurementCostTrends, auth: true },
   'GET /api/procurement/recommendations': { handler: dashboardRoutes.handleGetProcurementRecommendations, auth: true },
   'GET /api/procurement/:id': { handler: procurementRoutes.handleGetProcurementOrder, auth: true },
-  'POST /api/procurement': { handler: procurementRoutes.handleCreateProcurementOrder, auth: true, roles: ['admin', 'operations', 'inventory', 'inventory_manager', 'operations_manager'] },
+  'POST /api/procurement': { handler: procurementRoutes.handleCreateProcurementOrder, auth: true, roles: ['admin', 'inventory', 'inventory_manager'] },
   'PUT /api/procurement/:id': { handler: procurementRoutes.handleUpdateProcurementOrder, auth: true, roles: ['admin', 'operations', 'operations_manager', 'executive'] },
   'DELETE /api/procurement/:id': { handler: procurementRoutes.handleDeleteProcurementOrder, auth: true, roles: ['admin', 'operations', 'operations_manager'] },
 
@@ -185,6 +187,7 @@ const routes = {
   'GET /api/reports/inventory-abc-analysis': { handler: reportsRoutes.handleGenerateInventoryABCAnalysisReport, auth: true, permission: { resource: 'reports', action: 'view' } },
   'GET /api/reports/executive-summary': { handler: reportsRoutes.handleGenerateExecutiveSummary, auth: true, permission: { resource: 'reports', action: 'view' } },
   'GET /api/reports/financial': { handler: reportsRoutes.handleGenerateFinancialReport, auth: true, permission: { resource: 'reports', action: 'view' } },
+  'GET /api/reports/inventory-transactions': { handler: reportsRoutes.handleGenerateInventoryTransactionsReport, auth: true, permission: { resource: 'reports', action: 'view' } },
 
   // Messages (all authenticated users)
   'GET /api/messages': { handler: messagesRoutes.handleGetMessages, auth: true },
@@ -285,8 +288,14 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   initSocket(server);
+  try {
+    await ensureForecastSchema();
+    console.log('✅ Forecast tables ready');
+  } catch (error) {
+    console.error('⚠️ Forecast schema init failed:', error.message);
+  }
   console.log(`🚀 Pure Node.js Backend Server running on http://localhost:${PORT}`);
   console.log(`📊 Database: ${process.env.DB_NAME || 'manufacturing_system'}`);
   console.log(`🔗 ML Service: ${process.env.ML_SERVICE_URL || 'http://localhost:8000'}`);

@@ -439,7 +439,7 @@ export default function Landing() {
               <h4 className="font-bold text-white mb-2 text-sm">Connect</h4>
               <ul className="space-y-1 text-xs">
                 <li className="text-neutral-400">✉️ info@kinglion.co.tz</li>
-                <li className="text-neutral-400">📞 +255 XXX XXXXXX</li>
+                <li className="text-neutral-400">📞 +250788809111</li>
                 <li className="text-neutral-400">🌐 www.kinglion.co.tz</li>
               </ul>
             </div>

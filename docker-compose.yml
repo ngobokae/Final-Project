@@ -10,7 +10,8 @@ services:
       - "3307:3306"  # host 3307 — avoids conflict with local MySQL on 3306
     volumes:
       - db_data:/var/lib/mysql
-      - ./Manaf1.sql:/docker-entrypoint-initdb.d/Manaf1.sql
+      - ./Manaf1.sql:/docker-entrypoint-initdb.d/01-Manaf1.sql
+      - ./docker/02-forecast-upload-tables.sql:/docker-entrypoint-initdb.d/02-forecast-upload-tables.sql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pJtesire74!"]
       interval: 10s

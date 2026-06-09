@@ -357,6 +357,121 @@ export const handleGenerateInventoryABCAnalysisReport = async (req, res) => {
   }
 };
 
+export const handleGenerateInventoryTransactionsReport = async (req, res) => {
+  try {
+    const queryParams = req.query || {};
+    const days = queryParams.days ? parseInt(queryParams.days, 10) : 30;
+    const limit = Math.max(1, Math.min(500, parseInt(queryParams.limit, 10) || 200));
+
+    const logs = await query(
+      `
+        SELECT
+          a.id,
+          a.created_at,
+          a.action,
+          a.entity_id as product_id,
+          a.details,
+          u.name as user_name
+        FROM audit_logs a
+        LEFT JOIN users u ON u.id = a.user_id
+        WHERE a.entity_type = 'inventory'
+          AND (
+            a.action LIKE 'INVENTORY_TXN_%'
+            OR a.action = 'PROCUREMENT_STATUS_UPDATE'
+          )
+          AND a.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+        ORDER BY a.created_at DESC
+        LIMIT ${limit}
+      `,
+      [days]
+    );
+
+    const details = (logs || []).map((l) => {
+      let parsed = l.details;
+      if (typeof parsed === 'string') {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch {
+          parsed = {};
+        }
+      }
+      parsed = parsed || {};
+      const qty = Number(parsed.quantity || 0);
+      const unitPrice = parsed.unit_price != null ? Number(parsed.unit_price) : null;
+      let totalAmount = parsed.total_amount != null ? Number(parsed.total_amount) : null;
+      if (totalAmount == null && unitPrice != null && qty > 0) {
+        totalAmount = unitPrice * qty;
+      }
+      const txnType =
+        parsed.transaction_type ||
+        (l.action.startsWith('INVENTORY_TXN_')
+          ? l.action.replace('INVENTORY_TXN_', '').toLowerCase()
+          : 'procurement_status');
+
+      return {
+        id: l.id,
+        date: l.created_at,
+        product_name: parsed.product_name || null,
+        sku: parsed.sku || null,
+        transaction_type: txnType,
+        quantity: qty,
+        unit_price: unitPrice,
+        total_amount: totalAmount,
+        previous_stock: parsed.previous_stock ?? null,
+        new_stock: parsed.new_stock ?? null,
+        user_name: l.user_name || 'System',
+        notes: parsed.notes || null,
+      };
+    });
+
+    let stockInValue = 0;
+    let stockInUnits = 0;
+    let soldRevenue = 0;
+    let soldUnits = 0;
+    let orderedValue = 0;
+    let orderedUnits = 0;
+
+    for (const row of details) {
+      const amount = Number(row.total_amount || 0);
+      const qty = Number(row.quantity || 0);
+      const type = String(row.transaction_type || '').toLowerCase();
+      if (type === 'stock_in') {
+        stockInUnits += qty;
+        stockInValue += amount;
+      } else if (type === 'sold') {
+        soldUnits += qty;
+        soldRevenue += amount;
+      } else if (type === 'ordered') {
+        orderedUnits += qty;
+        orderedValue += amount;
+      }
+    }
+
+    const summary = {
+      total_transactions: details.length,
+      stock_in_units: stockInUnits,
+      stock_in_value: Math.round(stockInValue * 100) / 100,
+      sold_units: soldUnits,
+      sold_revenue: Math.round(soldRevenue * 100) / 100,
+      ordered_units: orderedUnits,
+      ordered_value: Math.round(orderedValue * 100) / 100,
+    };
+
+    sendJSON(res, 200, {
+      success: true,
+      report: {
+        type: 'inventory_transactions',
+        period: days,
+        summary,
+        details,
+      },
+    });
+  } catch (error) {
+    console.error('Generate inventory transactions report error:', error);
+    sendError(res, 500, 'Failed to generate inventory transactions report');
+  }
+};
+
 // Executive Reports
 export const handleGenerateExecutiveSummary = async (req, res) => {
   try {
@@ -394,10 +509,56 @@ export const handleGenerateExecutiveSummary = async (req, res) => {
     const [procurementSummary] = await query(`
       SELECT 
         COUNT(*) as orders,
-        SUM(total_cost) as total_spend
+        SUM(total_cost) as total_spend,
+        SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) as delivered_orders,
+        SUM(CASE WHEN status = 'delivered' THEN total_cost ELSE 0 END) as delivered_spend
       FROM procurement_orders
       WHERE order_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
     `, [days]);
+
+    const recentTransactions = await query(
+      `
+        SELECT
+          a.id,
+          a.created_at,
+          a.details,
+          u.name as user_name
+        FROM audit_logs a
+        LEFT JOIN users u ON u.id = a.user_id
+        WHERE a.entity_type = 'inventory'
+          AND a.action LIKE 'INVENTORY_TXN_%'
+          AND a.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+        ORDER BY a.created_at DESC
+        LIMIT 25
+      `,
+      [days]
+    );
+
+    const transactionHistory = (recentTransactions || []).map((l) => {
+      let parsed = l.details;
+      if (typeof parsed === 'string') {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch {
+          parsed = {};
+        }
+      }
+      parsed = parsed || {};
+      const qty = Number(parsed.quantity || 0);
+      const unitPrice = parsed.unit_price != null ? Number(parsed.unit_price) : null;
+      let totalAmount = parsed.total_amount != null ? Number(parsed.total_amount) : null;
+      if (totalAmount == null && unitPrice != null && qty > 0) {
+        totalAmount = unitPrice * qty;
+      }
+      return {
+        date: l.created_at,
+        product_name: parsed.product_name || null,
+        transaction_type: parsed.transaction_type || null,
+        quantity: qty,
+        total_amount: totalAmount,
+        user_name: l.user_name || 'System',
+      };
+    });
 
     sendJSON(res, 200, {
       success: true,
@@ -407,7 +568,8 @@ export const handleGenerateExecutiveSummary = async (req, res) => {
         sales: salesSummary || {},
         production: productionSummary || {},
         inventory: inventorySummary || {},
-        procurement: procurementSummary || {}
+        procurement: procurementSummary || {},
+        recent_transactions: transactionHistory,
       }
     });
   } catch (error) {
@@ -433,18 +595,19 @@ export const handleGenerateFinancialReport = async (req, res) => {
 
     const costs = await query(`
       SELECT 
-        DATE(order_date) as date,
+        DATE(COALESCE(actual_delivery, updated_at, order_date)) as date,
         SUM(total_cost) as cost
       FROM procurement_orders
-      WHERE order_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-      GROUP BY DATE(order_date)
+      WHERE status = 'delivered'
+        AND COALESCE(actual_delivery, updated_at, order_date) >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+      GROUP BY DATE(COALESCE(actual_delivery, updated_at, order_date))
       ORDER BY date ASC
     `, [days]);
 
     const [summary] = await query(`
       SELECT 
         (SELECT SUM(total_amount) FROM sales WHERE sale_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)) as total_revenue,
-        (SELECT SUM(total_cost) FROM procurement_orders WHERE order_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)) as total_costs,
+        (SELECT SUM(total_cost) FROM procurement_orders WHERE status = 'delivered' AND COALESCE(actual_delivery, updated_at, order_date) >= DATE_SUB(CURDATE(), INTERVAL ? DAY)) as total_costs,
         (SELECT SUM(i.current_stock * p.unit_cost) FROM inventory i JOIN products p ON i.product_id = p.id WHERE p.is_active = TRUE) as inventory_value
     `, [days, days]);
 

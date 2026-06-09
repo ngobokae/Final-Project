@@ -43,8 +43,13 @@ export default function InventoryDashboard() {
   const [forecastChart, setForecastChart] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
   const [replenishingIds, setReplenishingIds] = useState({});
+  const [aiRecommendations, setAiRecommendations] = useState([]);
 
   const reorderSuggestions = useMemo(() => {
+    const recByProduct = new Map(
+      (aiRecommendations || []).map((rec) => [Number(rec.product_id), rec])
+    );
+
     return inventory
       .filter(item => {
         const avail = item.available_stock ?? item.current_stock ?? 0;
@@ -53,36 +58,47 @@ export default function InventoryDashboard() {
       })
       .slice(0, 4)
       .map(item => {
+        const productId = Number(item.product_id || item.id);
+        const rec = recByProduct.get(productId);
         const avail = item.available_stock ?? item.current_stock ?? 0;
         const safety = item.safety_stock || 0;
-        const suggestedQty = Math.max(50, (item.reorder_point || 100) * 2 - avail);
+        const aiQty = Number(rec?.effective_order_quantity ?? rec?.optimal_order_quantity ?? 0);
+        const fallbackQty = Math.max(50, (item.reorder_point || 100) * 2 - avail);
+        const suggestedQty = aiQty > 0 ? Math.max(1, aiQty) : fallbackQty;
         return {
           ...item,
           current: avail,
           suggestedQty,
+          aiSuggested: aiQty > 0,
           priority: avail <= safety ? 'critical' : 'medium',
-          reason: avail <= safety ? 'Below Safety Stock: Immediate stockout risk.' : 'Below Reorder Point: Replenishment advised.'
+          reason: rec?.reasoning || (avail <= safety ? 'Below Safety Stock: Immediate stockout risk.' : 'Below Reorder Point: Replenishment advised.')
         };
       });
-  }, [inventory]);
+  }, [inventory, aiRecommendations]);
 
   const handleAutoReplenish = async (item) => {
     setReplenishingIds(prev => ({ ...prev, [item.id]: true }));
     try {
+      const productId = item.product_id || item.id;
+      const quantity = item.suggestedQty;
+      const unitCost = item.unit_cost || 10;
+
       await apiPost('/api/procurement', {
-        product_id: item.product_id || item.id,
+        product_id: productId,
         supplier_name: 'Kinglion Rwanda Main Supplier',
-        quantity: item.suggestedQty,
-        unit_cost: item.unit_cost || 10,
+        quantity,
+        unit_cost: unitCost,
         expected_delivery: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        notes: `Automated Dashboard replenishment: ${item.reason}`
+        notes: `Quick PO from Inventory Dashboard: ${item.reason}`
       });
-      
+
+      window.dispatchEvent(new Event('app:operations-data-updated'));
+      window.dispatchEvent(new Event('app:notifications-changed'));
       window.dispatchEvent(new CustomEvent('app:toast', { 
         detail: { 
           type: 'success', 
-          title: 'Restock Order Placed', 
-          description: `Successfully placed replenishment order of ${item.suggestedQty} units for ${item.product_name || item.name}.` 
+          title: 'Order Sent to Operations', 
+          description: `Quick PO for ${quantity} units of ${item.product_name || item.name} is pending Operations approval. Stock will update when goods are received.` 
         } 
       }));
       
@@ -104,15 +120,17 @@ export default function InventoryDashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const [inventoryData, alertsData, dashboardInventory, forecastData, auditData] = await Promise.all([
+      const [inventoryData, alertsData, dashboardInventory, forecastData, auditData, recsData] = await Promise.all([
         apiGet('/api/inventory').catch(() => ({ inventory: [] })),
         apiGet('/api/inventory/alerts?severity=high').catch(() => ({ alerts: [] })),
         apiGet('/api/dashboard/inventory').catch(() => null),
         apiGet('/api/dashboard/forecast-chart?days=90').catch(() => ({ chartData: [] })),
-        apiGet('/api/audit?limit=10&entity_type=inventory').catch(() => ({ logs: [] }))
+        apiGet('/api/audit?limit=10&entity_type=inventory').catch(() => ({ logs: [] })),
+        apiGet('/api/forecast/recommendations').catch(() => ({ recommendations: [] }))
       ]);
 
       setInventory(inventoryData.inventory || []);
+      setAiRecommendations(recsData?.recommendations || []);
       setAlerts(alertsData.alerts || []);
       setInventoryDashboard(dashboardInventory || null);
       setForecastChart(forecastData.chartData || []);

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { FileText, Download, Calendar, Filter, BarChart3, TrendingUp, Package, DollarSign, Loader2 } from 'lucide-react';
+import { FileText, Download, Calendar, BarChart3, TrendingUp, Package, DollarSign, Loader2, ArrowUpDown } from 'lucide-react';
+import { formatCurrency } from '../../utils/currency';
 import { apiGet } from '../../utils/api';
 import { downloadCsvReport, downloadExcelReport } from '../../utils/reportExport';
 
@@ -38,6 +39,13 @@ export default function OperationsReports() {
       icon: BarChart3,
       description: 'Overall operations performance summary',
       endpoint: '/api/reports/executive-summary'
+    },
+    {
+      id: 'inventory-transactions',
+      name: 'Inventory Transactions',
+      icon: ArrowUpDown,
+      description: 'Recent stock movements, orders, and procurement history',
+      endpoint: '/api/reports/inventory-transactions'
     }
   ];
 
@@ -215,8 +223,63 @@ export default function OperationsReports() {
             ))}
           </div>
           {reportData.details && reportData.details.length > 0 && (
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               {reportData.details.length} records found
+            </div>
+          )}
+          {reportData.type === 'inventory_transactions' && reportData.details?.length > 0 && (
+            <div className="overflow-x-auto border rounded-lg">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 dark:bg-neutral-800">
+                  <tr>
+                    <th className="text-left p-2">Date</th>
+                    <th className="text-left p-2">Product</th>
+                    <th className="text-left p-2">Type</th>
+                    <th className="text-right p-2">Qty</th>
+                    <th className="text-right p-2">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.details.slice(0, 15).map((row) => (
+                    <tr key={row.id} className="border-t border-gray-100 dark:border-neutral-800">
+                      <td className="p-2">{row.date ? new Date(row.date).toLocaleDateString() : '-'}</td>
+                      <td className="p-2">{row.product_name || '-'}</td>
+                      <td className="p-2">{String(row.transaction_type || '-').replace(/_/g, ' ')}</td>
+                      <td className="p-2 text-right">{row.quantity ?? '-'}</td>
+                      <td className="p-2 text-right">{row.total_amount != null ? formatCurrency(row.total_amount) : '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {reportData.type === 'executive_summary' && reportData.recent_transactions?.length > 0 && (
+            <div className="mt-4">
+              <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Recent Transaction History</h3>
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 dark:bg-neutral-800">
+                    <tr>
+                      <th className="text-left p-2">Date</th>
+                      <th className="text-left p-2">Product</th>
+                      <th className="text-left p-2">Type</th>
+                      <th className="text-right p-2">Qty</th>
+                      <th className="text-right p-2">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reportData.recent_transactions.slice(0, 10).map((row, idx) => (
+                      <tr key={idx} className="border-t border-gray-100 dark:border-neutral-800">
+                        <td className="p-2">{row.date ? new Date(row.date).toLocaleDateString() : '-'}</td>
+                        <td className="p-2">{row.product_name || '-'}</td>
+                        <td className="p-2">{String(row.transaction_type || '-').replace(/_/g, ' ')}</td>
+                        <td className="p-2 text-right">{row.quantity ?? '-'}</td>
+                        <td className="p-2 text-right">{row.total_amount != null ? formatCurrency(row.total_amount) : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>

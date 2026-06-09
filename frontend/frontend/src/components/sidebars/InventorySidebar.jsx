@@ -56,7 +56,7 @@ export default function InventorySidebar() {
       title: 'Inventory Operations',
       items: [
         { to: '/inventory/stock-transactions', icon: ArrowUpDown, label: 'Stock Transactions', badge: null },
-        { to: '/inventory/pending-receivables', icon: Truck, label: 'Pending Receivables', badge: null },
+        { to: '/inventory/pending-receivables', icon: Truck, label: 'Pending Delivery', badge: null },
         { to: '/inventory/warehouse-map', icon: Warehouse, label: 'Warehouse Map', badge: null },
         { to: '/inventory/alerts', icon: AlertTriangle, label: 'Alerts', badge: counts.alerts > 0 ? String(counts.alerts) : null }
       ]

@@ -1,6 +1,7 @@
 import { query } from '../config/database.js';
 import { sendSuccess, sendError, parseBody } from '../utils/helpers.js';
 import { logAudit } from '../utils/logger.js';
+import { clearInventoryRecommendationForProduct } from '../utils/procurementHelpers.js';
 
 const getProcurementColumnInfo = async () => {
   let cols = [];
@@ -13,6 +14,7 @@ const getProcurementColumnInfo = async () => {
     (cols || []).some((c) => String(c.Field || '').toLowerCase() === String(name).toLowerCase());
   return {
     hasCreatedBy: hasCol('created_by'),
+    hasStatus: hasCol('status'),
     expectedCol: hasCol('expected_delivery')
       ? 'expected_delivery'
       : hasCol('expected_delivery_date')
@@ -29,6 +31,75 @@ const getProcurementColumnInfo = async () => {
 };
 
 const toSqlValue = (value) => (value === undefined ? null : value);
+
+const getProductInventoryContext = async (productId) => {
+  const rows = await query(
+    `
+      SELECT p.id, p.sku, p.name as product_name, i.current_stock
+      FROM products p
+      LEFT JOIN inventory i ON i.product_id = p.id
+      WHERE p.id = ?
+    `,
+    [productId]
+  );
+  return rows[0] || null;
+};
+
+const statusToTransactionType = (status) => {
+  const st = String(status || '').toLowerCase();
+  if (st === 'approved') return 'order_approved';
+  if (st === 'in_transit') return 'in_transit';
+  if (st === 'delivered') return 'stock_in';
+  if (st === 'cancelled') return 'order_cancelled';
+  if (st === 'delayed') return 'order_delayed';
+  return 'procurement_status';
+};
+
+const logInventoryProcurementEvent = async (
+  req,
+  {
+    productId,
+    productName,
+    sku,
+    transactionType,
+    quantity,
+    unitCost,
+    delta,
+    previousStock,
+    newStock,
+    notes,
+    procurementOrderId,
+    previousStatus,
+    newStatus,
+  }
+) => {
+  const actionKey = String(transactionType).toUpperCase().replace(/-/g, '_');
+  const unitPrice = Number(unitCost || 0);
+  const qty = Number(quantity || 0);
+  await logAudit(
+    req.user?.id || null,
+    `INVENTORY_TXN_${actionKey}`,
+    'inventory',
+    productId,
+    {
+      product_id: productId,
+      product_name: productName,
+      sku,
+      transaction_type: transactionType,
+      quantity: qty,
+      unit_price: unitPrice > 0 ? unitPrice : null,
+      total_amount: unitPrice > 0 && qty > 0 ? unitPrice * qty : null,
+      delta: Number(delta || 0),
+      previous_stock: previousStock ?? null,
+      new_stock: newStock ?? null,
+      procurement_order_id: procurementOrderId,
+      previous_status: previousStatus || null,
+      new_status: newStatus || null,
+      notes,
+    },
+    req
+  );
+};
 
 export const handleGetProcurementOrders = async (req, res) => {
   try {
@@ -89,7 +160,12 @@ export const handleCreateProcurementOrder = async (req, res) => {
     const { product_id, supplier_name, quantity, unit_cost, expected_delivery, notes } = body;
     const total_cost = quantity * unit_cost;
 
-    const { hasCreatedBy, expectedCol } = await getProcurementColumnInfo();
+    const productCtx = await getProductInventoryContext(product_id);
+    if (!productCtx) {
+      return sendError(res, 404, 'Product not found');
+    }
+
+    const { hasCreatedBy, hasStatus, expectedCol } = await getProcurementColumnInfo();
     const fields = [
       'product_id',
       'supplier_name',
@@ -100,6 +176,7 @@ export const handleCreateProcurementOrder = async (req, res) => {
       ...(expectedCol ? [expectedCol] : []),
       'notes',
       ...(hasCreatedBy ? ['created_by'] : []),
+      ...(hasStatus ? ['status'] : []),
     ];
     const values = [
       product_id,
@@ -111,14 +188,33 @@ export const handleCreateProcurementOrder = async (req, res) => {
       ...(expectedCol ? [expected_delivery || null] : []),
       notes,
       ...(hasCreatedBy ? [req.user?.id || null] : []),
+      ...(hasStatus ? ['pending'] : []),
     ];
     const placeholders = fields.map(() => '?').join(', ');
     const result = await query(
       `INSERT INTO procurement_orders (${fields.join(', ')}) VALUES (${placeholders})`,
       values
     );
-    
-    sendSuccess(res, { id: result.insertId, message: 'Procurement order created' }, 201);
+
+    const orderId = result.insertId;
+    const previousStock = Number(productCtx.current_stock || 0);
+    await logInventoryProcurementEvent(req, {
+      productId: product_id,
+      productName: productCtx.product_name,
+      sku: productCtx.sku,
+      transactionType: 'ordered',
+      quantity,
+      unitCost: unit_cost,
+      delta: 0,
+      previousStock,
+      newStock: previousStock,
+      procurementOrderId: orderId,
+      previousStatus: null,
+      newStatus: 'pending',
+      notes: notes || `Procurement order #${orderId} created — awaiting Operations approval`,
+    });
+
+    sendSuccess(res, { id: orderId, message: 'Procurement order created and sent for approval' }, 201);
   } catch (error) {
     console.error('Create procurement order error:', error);
     sendError(res, 500, 'Failed to create procurement order');
@@ -132,7 +228,12 @@ export const handleUpdateProcurementOrder = async (req, res) => {
     const { supplier_name, quantity, unit_cost, expected_delivery, actual_delivery, status, notes } = body;
 
     const existingRows = await query(
-      'SELECT id, product_id, quantity, status FROM procurement_orders WHERE id = ? LIMIT 1',
+      `SELECT po.id, po.product_id, po.quantity, po.unit_cost, po.supplier_name, po.status,
+              p.sku, p.name as product_name, i.current_stock
+       FROM procurement_orders po
+       JOIN products p ON p.id = po.product_id
+       LEFT JOIN inventory i ON i.product_id = po.product_id
+       WHERE po.id = ? LIMIT 1`,
       [id]
     );
     if (!existingRows.length) {
@@ -174,17 +275,21 @@ export const handleUpdateProcurementOrder = async (req, res) => {
 
     const nextStatus = status || existing.status;
     const statusChanged = nextStatus !== existing.status;
-    const transitionedToDelivered = existing.status !== 'delivered' && nextStatus === 'delivered';
-    if (transitionedToDelivered) {
-      const deliveredQty = Number(quantity ?? existing.quantity ?? 0);
-      if (deliveredQty > 0) {
-        await query(
-          'UPDATE inventory SET current_stock = current_stock + ? WHERE product_id = ?',
-          [deliveredQty, existing.product_id]
-        );
-      }
+    const prevStatus = String(existing.status || '').toLowerCase();
+    const nextStatusLower = String(nextStatus || '').toLowerCase();
+    const transitionedToDelivered = prevStatus !== 'delivered' && nextStatusLower === 'delivered';
+    const orderQty = Number(quantity ?? existing.quantity ?? 0);
+    const unitCost = Number(unit_cost ?? existing.unit_cost ?? 0);
+    const previousStock = Number(existing.current_stock || 0);
+    let newStock = previousStock;
 
-      // Order is fulfilled: resolve active low-stock/procurement pressure alerts for this product.
+    if (transitionedToDelivered && orderQty > 0) {
+      newStock = previousStock + orderQty;
+      await query(
+        'UPDATE inventory SET current_stock = ? WHERE product_id = ?',
+        [newStock, existing.product_id]
+      );
+
       await query(
         `
           UPDATE alerts
@@ -195,6 +300,8 @@ export const handleUpdateProcurementOrder = async (req, res) => {
         `,
         [req.user?.id || null, existing.product_id]
       ).catch(() => {});
+
+      await clearInventoryRecommendationForProduct(existing.product_id);
     }
 
     if (statusChanged) {
@@ -263,26 +370,30 @@ export const handleUpdateProcurementOrder = async (req, res) => {
         ).catch(() => {});
       }
 
-      // Only log key terminal states to inventory history:
-      // - delivered (stock arrives / production completed)
-      // - cancelled (order will not proceed)
+      const txnType = statusToTransactionType(nextStatus);
+      const statusNotes = {
+        approved: `Procurement order #${existing.id} approved — ${orderQty} units confirmed for delivery and production planning`,
+        in_transit: `Procurement order #${existing.id} in transit — delivery pending`,
+        delivered: `Procurement order #${existing.id} delivered — stock received`,
+        cancelled: `Procurement order #${existing.id} declined/cancelled`,
+        delayed: `Procurement order #${existing.id} marked delayed`,
+      };
       const st = String(nextStatus || '').toLowerCase();
-      if (st === 'delivered' || st === 'cancelled') {
-        await logAudit(
-          req.user?.id || null,
-          'PROCUREMENT_STATUS_UPDATE',
-          'inventory',
-          existing.product_id,
-          {
-            order_id: existing.id,
-            product_id: existing.product_id,
-            previous_status: existing.status,
-            new_status: nextStatus,
-            quantity: Number(quantity ?? existing.quantity ?? 0),
-          },
-          req
-        );
-      }
+      await logInventoryProcurementEvent(req, {
+        productId: existing.product_id,
+        productName: existing.product_name,
+        sku: existing.sku,
+        transactionType: txnType,
+        quantity: orderQty,
+        unitCost,
+        delta: transitionedToDelivered ? orderQty : 0,
+        previousStock,
+        newStock: transitionedToDelivered ? newStock : previousStock,
+        procurementOrderId: existing.id,
+        previousStatus: existing.status,
+        newStatus: nextStatus,
+        notes: statusNotes[st] || `Procurement order #${existing.id}: ${existing.status} → ${nextStatus}`,
+      });
     }
     
     sendSuccess(res, { message: 'Procurement order updated' });
