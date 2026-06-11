@@ -520,17 +520,7 @@ export default function DemandForecast() {
                 </div>
               </CardHeader>
             </Card>
-          ) : (
-            <Card className="border-amber-200 bg-amber-50">
-              <CardContent className="pt-6">
-                <p className="text-sm text-amber-900">
-                  Select a product in <strong>Forecast Configuration → Product Filter</strong>, then click{' '}
-                  <strong>Run Predict 2 (Demand)</strong>. Predictions are stored in the database and appear in the
-                  forecast chart and &quot;Previous predictions&quot; table on this page.
-                </p>
-              </CardContent>
-            </Card>
-          )}
+          ) : null}
 
           {forecasts.length > 0 && (
             <Card>
@@ -636,12 +626,29 @@ export default function DemandForecast() {
             <CardContent>
               {forecasts.length > 0 ? (
                 <div className="max-h-[34rem] overflow-y-auto space-y-4 pr-2">
-                  {forecasts.slice(0, 20).map((forecast, index) => (
+                  {Object.values(
+                    forecasts.reduce((acc, f) => {
+                      const key = f.product_id || f.product_name;
+                      if (!acc[key]) {
+                        acc[key] = {
+                          product_name: f.product_name || 'Product',
+                          sku: f.sku,
+                          total_forecast: 0,
+                          rows: 0,
+                          confidence: f.confidence_level,
+                          trend_indicator: f.trend_indicator,
+                        };
+                      }
+                      acc[key].total_forecast += Number(f.forecasted_demand || 0);
+                      acc[key].rows += 1;
+                      return acc;
+                    }, {})
+                  ).slice(0, 30).map((forecast, index) => (
                     <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-800 dark:border-neutral-600 transition-colors">
                       <div>
-                        <h4 className="font-medium">{forecast.product_name || 'Product'}</h4>
+                        <h4 className="font-medium">{forecast.product_name}</h4>
                         <p className="text-sm text-gray-500">
-                          Forecast: {forecast.forecasted_demand} units • Confidence: {Math.round((forecast.confidence_level || 0.95) * 100)}%
+                          Total forecast: {Math.round(forecast.total_forecast)} units • {forecast.rows} prediction row(s) • Confidence: {Math.round((forecast.confidence || 0.95) * 100)}%
                         </p>
                       </div>
                       <div className="flex items-center gap-2">

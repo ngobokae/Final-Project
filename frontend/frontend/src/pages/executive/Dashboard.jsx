@@ -39,7 +39,10 @@ export default function ExecutiveDashboard() {
   const [simPriceChange, setSimPriceChange] = useState(0);
   const [simCostReduction, setSimCostReduction] = useState(0);
 
-  const baseRevenue = stats?.totalRevenue || 5000000;
+  const [strategicInsights, setStrategicInsights] = useState([]);
+  const [strategicAlerts, setStrategicAlerts] = useState([]);
+
+  const baseRevenue = stats?.netRevenue ?? stats?.totalRevenue ?? 0;
   const baseProfit = baseRevenue * 0.25;
   const simulatedProjections = {
     revenue: baseRevenue * (1 + simPriceChange / 100),
@@ -84,7 +87,8 @@ export default function ExecutiveDashboard() {
       'accuracy': '/executive/kpis',
       'inventory': '/executive/kpis',
       'stockout': '/executive/kpis',
-      'satisfaction': '/executive/kpis'
+      'satisfaction': '/executive/kpis',
+      'prediction_revenue': '/executive/insights'
     };
     
     const route = navigationMap[kpiId];
@@ -109,6 +113,7 @@ export default function ExecutiveDashboard() {
         healthData,
         revenueProfitRes,
         insightsRes,
+        alertsRes,
         auditData
       ] = await Promise.all([
         apiGet(`/api/dashboard/stats?days=${days}`).catch(() => ({ stats: {} })),
@@ -121,6 +126,7 @@ export default function ExecutiveDashboard() {
         apiGet(`/api/dashboard/health-metrics?days=${days}`).catch(() => ({ healthMetrics: [] })),
         apiGet(`/api/dashboard/revenue-profit-trend?days=${days}`).catch(() => ({ trend: [] })),
         apiGet('/api/insights?type=opportunity&dismissed=false').catch(() => ({})),
+        apiGet('/api/inventory/alerts?severity=high').catch(() => ({ alerts: [] })),
         apiGet('/api/audit?limit=10').catch(() => ({ logs: [] }))
       ]);
 
@@ -134,10 +140,17 @@ export default function ExecutiveDashboard() {
 
       setStats({
         ...dashboardStats.stats,
-        totalRevenue: salesStatsResp.totalRevenue || 0,
+        netRevenue: Number(dashboardStats.stats?.net_revenue ?? dashboardStats.stats?.total_revenue ?? 0),
+        totalRevenue: Number(dashboardStats.stats?.net_revenue ?? dashboardStats.stats?.total_revenue ?? 0),
+        actualRevenue: Number(dashboardStats.stats?.actual_revenue ?? 0),
+        predictionRevenue: Number(dashboardStats.stats?.prediction_revenue ?? dashboardStats.stats?.total_revenue_forecast ?? 0),
+        procurementDeductions: Number(dashboardStats.stats?.procurement_deductions ?? 0),
         totalSales: salesStatsResp.totalRecords || 0,
-        revenueAtRisk: revenueAtRisk || 4500000 // Fallback for demo
+        revenueAtRisk: revenueAtRisk || 0
       });
+
+      const alertList = Array.isArray(alertsRes?.alerts) ? alertsRes.alerts : [];
+      setStrategicAlerts(alertList.slice(0, 8));
 
       const insightsRaw = Array.isArray(insightsRes) ? insightsRes : (insightsRes?.data?.insights || insightsRes?.insights || []);
       const insights = (insightsRaw || []).slice(0, 5).map(insight => ({
@@ -159,21 +172,19 @@ export default function ExecutiveDashboard() {
       setRegionalData(regionalDataRes.regionalData || []);
       setHealthMetrics(healthData.healthMetrics || []);
 
-      // Revenue & orders: prefer /api/sales/stats (same as Operations), then dashboard/stats
-      const revenueFromSales = Number(salesStatsResp?.totalRevenue) ?? 0;
-      const ordersFromSales = Number(salesStatsResp?.totalRecords) ?? 0;
-      const revenueFromDash = Number(dashboardStats.stats?.total_revenue) ?? 0;
-      const ordersFromDash = Number(dashboardStats.stats?.total_sales) ?? 0;
-      const revenueActual = revenueFromSales || revenueFromDash;
-      const revenueForecast = Number(dashboardStats.stats?.total_revenue_forecast) ?? 0;
-      const revenue = revenueActual + revenueForecast;
-      const orders = ordersFromSales || ordersFromDash;
+      // Net revenue from sold/stock-out transactions minus accepted procurement orders
+      const revenueActual = Number(dashboardStats.stats?.actual_revenue ?? dashboardStats.stats?.transaction_revenue ?? 0);
+      const revenueForecast = Number(dashboardStats.stats?.prediction_revenue ?? dashboardStats.stats?.total_revenue_forecast ?? 0);
+      const revenue = Number(dashboardStats.stats?.net_revenue ?? dashboardStats.stats?.total_revenue ?? revenueActual);
+      const orders = Number(salesStatsResp?.totalRecords ?? dashboardStats.stats?.total_sales ?? 0);
 
-      const prevRev = Number(dashboardStats.stats?.sales_growth_pct) != null && revenueActual > 0
-        ? revenueActual / (1 + (dashboardStats.stats.sales_growth_pct / 100))
-        : revenueActual * 0.85;
-      const previousRevenue = prevRev;
-      const previousOrders = prevRev > 0 && revenueActual > 0 ? Math.round(orders * (previousRevenue / revenueActual)) : Math.round(orders * 0.92);
+      const growthPct = Number(dashboardStats.stats?.sales_growth_pct ?? 0);
+      const previousRevenue = growthPct !== 0 && revenue > 0
+        ? revenue / (1 + growthPct / 100)
+        : revenue * 0.92;
+      const previousOrders = previousRevenue > 0 && revenue > 0
+        ? Math.round(orders * (previousRevenue / revenue))
+        : Math.round(orders * 0.92);
 
       const trendArray = revenueProfitRes?.trend || [];
       if (trendArray.length === 0 && (revenueActual > 0 || (salesData.chartData || []).length > 0)) {
@@ -223,7 +234,11 @@ export default function ExecutiveDashboard() {
       if (!accuracy && forecastData.chartData?.length > 0) accuracy = 95;
 
       const inventoryValue = Number(dashboardStats.stats?.inventory_value) || 0;
-      const turnover = inventoryValue > 0 && days > 0 ? (revenue / inventoryValue) * (365 / days) : 0;
+      const turnover = Number(dashboardStats.stats?.inventory_turnover) || (
+        inventoryValue > 0 && revenueActual > 0 && days > 0
+          ? (revenueActual / inventoryValue) * (365 / days)
+          : 0
+      );
 
       const lowStock = Number(dashboardStats.stats?.low_stock_items) || 0;
       const totalProducts = Math.max(1, Number(dashboardStats.stats?.total_products) || 1);
@@ -248,7 +263,8 @@ export default function ExecutiveDashboard() {
           icon: DollarSign,
           color: 'text-blue-600 dark:text-blue-400',
           bgColor: 'bg-blue-50 dark:bg-blue-950',
-          sparkline: revenueSpark
+          sparkline: revenueSpark,
+          subtitle: 'Sold/stock-out minus procurement'
         },
         {
           id: 'orders',
@@ -303,24 +319,25 @@ export default function ExecutiveDashboard() {
           inverse: true
         },
         {
-          id: 'satisfaction',
-          title: 'Customer Satisfaction',
-          value: 4.7,
-          change: 5.4,
-          trend: 'up',
-          target: 4.8,
-          icon: Users,
+          id: 'prediction_revenue',
+          title: 'Prediction Revenue',
+          value: revenueForecast,
+          change: revenueForecast > 0 ? 8.2 : 0,
+          trend: revenueForecast > 0 ? 'up' : 'down',
+          target: Math.max(revenueForecast * 1.15, 1),
+          icon: Sparkles,
           color: 'text-indigo-600 dark:text-indigo-400',
           bgColor: 'bg-indigo-50 dark:bg-indigo-950',
-          sparkline: [4.2, 4.3, 4.4, 4.5, 4.6, 4.65, 4.7],
-          suffix: '/5'
+          sparkline: revenueForecast > 0 ? [0, revenueForecast * 0.7, revenueForecast * 0.85, revenueForecast] : [0],
+          isCurrency: true,
+          subtitle: 'Forecast demand × unit price'
         }
       ]);
 
       const compData = [
-        { metric: 'Revenue', actual: revenue, forecast: revenueForecast || revenue, previous: previousRevenue },
+        { metric: 'Net Revenue', actual: revenue, forecast: revenueForecast, previous: previousRevenue },
+        { metric: 'Actual Sales', actual: revenueActual, forecast: revenueActual, previous: previousRevenue },
         { metric: 'Orders', actual: orders, forecast: orders, previous: previousOrders },
-        { metric: 'Avg Order Value', actual: orders > 0 ? Math.round(revenue / orders) : 0, forecast: orders > 0 ? Math.round(revenue / orders) : 0, previous: previousOrders > 0 ? Math.round(previousRevenue / previousOrders) : 0 },
         { metric: 'Forecast Accuracy', actual: accuracy, forecast: 95, previous: 0 }
       ];
       setKpiComparison(compData);
@@ -357,8 +374,6 @@ export default function ExecutiveDashboard() {
         profit: (item.revenue || 0) * 0.21,
         orders: item.sales_count || 0
       })).slice(-30);
-
-  const [strategicInsights, setStrategicInsights] = useState([]);
 
   if (loading) {
     return (
@@ -411,21 +426,19 @@ export default function ExecutiveDashboard() {
         </div>
         <div className="flex-1 overflow-hidden whitespace-nowrap">
            <div className="flex items-center gap-10 animate-marquee hover:pause-marquee">
-              <span className="text-sm font-medium flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-500" />
-                CRITICAL SHORTAGE DETECTED: <span className="text-red-400 font-bold">Motorcycle Spare Parts</span> - Stockout probability 84% within 7 days.
-              </span>
-              <span className="text-sm font-medium flex items-center gap-2">
-                <Zap className="w-4 h-4 text-emerald-500" />
-                OPPORTUNITY: <span className="text-emerald-400 font-bold">Roofing Sheets</span> demand expected to surge 22% next month. Optimize bulk procurement.
-              </span>
+              {(strategicAlerts.length > 0 ? strategicAlerts : strategicInsights).map((item, idx) => (
+                <span key={item.id || idx} className="text-sm font-medium flex items-center gap-2">
+                  <AlertTriangle className={`w-4 h-4 ${item.severity === 'critical' ? 'text-red-500' : 'text-amber-500'}`} />
+                  {(item.message || item.title || item.description || 'System alert').toString().slice(0, 120)}
+                </span>
+              ))}
+              {strategicAlerts.length === 0 && strategicInsights.length === 0 && (
+                <span className="text-sm opacity-90">No active alerts — inventory and operations are within normal thresholds.</span>
+              )}
               <span className="text-sm font-medium flex items-center gap-2">
                 <DollarSign className="w-4 h-4 text-blue-400" />
-                COST OF INACTION: Current stock imbalances represent <span className="text-red-400 font-bold">{formatCurrency(stats?.revenueAtRisk || 0)}</span> in potential lost revenue this quarter.
+                Revenue at risk from stock imbalances: <span className="text-red-400 font-bold">{formatCurrency(stats?.revenueAtRisk || 0)}</span>
               </span>
-              <span className="text-sm opacity-90">Inventory levels for "Iron Sheets" optimized - Predicted profit increase of 4.2% next quarter.</span>
-              <div className="h-4 w-px bg-white/20 mx-4"></div>
-              <span className="text-sm opacity-90">Demand for "Model 150" peaking in Eastern Region - Recommend shifting stock to Kigali hub.</span>
            </div>
         </div>
       </div>
@@ -448,7 +461,10 @@ export default function ExecutiveDashboard() {
                 <div className="space-y-1">
                   <CardTitle className="text-sm font-medium">{kpi.title}</CardTitle>
                   {kpi.id === 'revenue' && (
-                    <CardDescription>Actual + forecast revenue for this period</CardDescription>
+                    <CardDescription>Sold/stock-out revenue minus accepted orders</CardDescription>
+                  )}
+                  {kpi.id === 'prediction_revenue' && (
+                    <CardDescription>Forecast demand value (not actual sales)</CardDescription>
                   )}
                 </div>
                 <div className={`p-2 rounded-lg ${kpi.bgColor}`}>
@@ -461,7 +477,7 @@ export default function ExecutiveDashboard() {
                 <div className="space-y-2">
                   <div className="flex items-baseline justify-between">
                     <div className="text-2xl font-bold">
-                      {kpi.id === 'revenue' ? formatCurrency(kpi.value) : kpi.value.toLocaleString()}
+                      {kpi.id === 'revenue' || kpi.isCurrency ? formatCurrency(kpi.value) : kpi.value.toLocaleString()}
                       {kpi.suffix || ''}
                     </div>
                     <div

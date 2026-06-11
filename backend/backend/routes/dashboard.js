@@ -1,6 +1,7 @@
 import { query } from '../config/database.js';
 import { sendJSON, sendError, parseQuery } from '../utils/helpers.js';
 import { generateAlertsFromInventory } from './inventory.js';
+import { calculateNetRevenueMetrics, calculateStockFlow } from '../utils/revenueMetrics.js';
 
 // Helper to calculate forecast accuracy
 const calculateForecastAccuracy = async () => {
@@ -213,15 +214,8 @@ export const handleGetDashboardStats = async (req, res) => {
     const prevRev = Number(prevSales?.total_revenue) || 0;
     const sales_growth_pct = prevRev > 0 ? ((currRev - prevRev) / prevRev) * 100 : 0;
 
-    // Revenue from forecast (next N days): sum(forecasted_demand * unit_price)
-    const [forecastRevenueRow] = await query(`
-      SELECT COALESCE(SUM(f.forecasted_demand * p.unit_price), 0) as total_revenue_forecast
-      FROM forecast_results f
-      JOIN products p ON f.product_id = p.id
-      WHERE f.forecast_date >= CURDATE()
-        AND f.forecast_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
-    `, [days]).catch(() => [{ total_revenue_forecast: 0 }]);
-    const total_revenue_forecast = Number(forecastRevenueRow?.total_revenue_forecast) || 0;
+    const revenueMetrics = await calculateNetRevenueMetrics(days);
+    const total_revenue_forecast = revenueMetrics.prediction_revenue;
 
     // Alerts
     const [alertCount] = await query(`
@@ -278,10 +272,17 @@ export const handleGetDashboardStats = async (req, res) => {
         inventory_value: inventoryValue.value || 0,
         total_sales: salesStats.total_sales || 0,
         total_quantity: salesStats.total_quantity || 0,
-        total_revenue: salesStats.total_revenue || 0,
+        total_revenue: revenueMetrics.net_revenue,
+        actual_revenue: revenueMetrics.actual_revenue,
+        transaction_revenue: revenueMetrics.transaction_revenue,
+        sales_revenue: revenueMetrics.sales_revenue,
+        procurement_deductions: revenueMetrics.procurement_deductions,
+        prediction_revenue: revenueMetrics.prediction_revenue,
         total_revenue_forecast: total_revenue_forecast,
+        net_revenue: revenueMetrics.net_revenue,
         sales_growth_pct: Math.round(sales_growth_pct * 10) / 10,
         critical_alerts: alertCount.count,
+        inventory_turnover: Math.round((await calculateInventoryTurnover(days)) * 10) / 10,
         ...roleSpecificStats
       }
     });
@@ -393,6 +394,8 @@ export const handleGetInventoryDashboard = async (req, res) => {
       ? 'Forecast error is elevated; review seasonality and SKU-level model tuning for high variance items.'
       : 'Forecast performance is within expected tolerance.';
 
+    const stockFlow = await calculateStockFlow(30);
+
     sendJSON(res, 200, {
       totalProducts: productCount.count,
       stockValue: Number(stockValue?.value) || 0,
@@ -406,6 +409,7 @@ export const handleGetInventoryDashboard = async (req, res) => {
       abcTopProducts: abcAnalysis.details,
       productsWithForecast: forecastSummary?.products_with_forecast ?? 0,
       totalForecastedDemand: Number(forecastSummary?.total_forecasted_demand) || 0,
+      stockFlow,
       chartData: inventoryChart,
       alerts,
       lowStockItems,

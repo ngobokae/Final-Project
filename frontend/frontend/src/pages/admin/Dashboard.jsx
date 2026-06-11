@@ -100,11 +100,11 @@ export default function AdminDashboard() {
       })));
 
       setSystemAlerts((adminData.alerts || []).map((a) => ({
-        icon: a.severity === 'critical' ? AlertTriangle : CheckCircle,
-        title: a.alert_type || 'System Alert',
+        icon: a.alert_type === 'login_failed' ? AlertTriangle : a.severity === 'critical' ? AlertTriangle : CheckCircle,
+        title: a.alert_type === 'login_failed' ? 'Failed Login' : a.alert_type === 'password_reset' ? 'Password Reset' : (a.alert_type || 'System Alert'),
         description: a.message || '',
         time: new Date(a.created_at).toLocaleString(),
-        color: a.severity === 'critical' || a.severity === 'high' ? 'amber' : 'green',
+        color: a.alert_type === 'login_failed' || a.severity === 'critical' || a.severity === 'high' ? 'amber' : 'green',
       })));
 
       setRecentActivity((adminData.recentActivity || []).map((row) => ({

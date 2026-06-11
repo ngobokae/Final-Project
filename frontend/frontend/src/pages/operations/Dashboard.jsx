@@ -16,6 +16,9 @@ export default function OperationsDashboard() {
   const navigate = useNavigate();
   const [metrics, setMetrics] = useState({
     salesThisMonth: null,
+    predictionRevenue: null,
+    actualRevenue: null,
+    procurementDeductions: null,
     salesGrowth: null,
     forecastAccuracy: null,
     pendingOrders: null,
@@ -100,7 +103,10 @@ export default function OperationsDashboard() {
           : dashStats.production_backlog ?? null;
 
       setMetrics({
-        salesThisMonth: monthlyRevenue,
+        salesThisMonth: Number(dashStats.net_revenue ?? dashStats.total_revenue ?? salesStatsResp?.totalRevenue ?? 0),
+        predictionRevenue: Number(dashStats.prediction_revenue ?? dashStats.total_revenue_forecast ?? 0),
+        actualRevenue: Number(dashStats.actual_revenue ?? 0),
+        procurementDeductions: Number(dashStats.procurement_deductions ?? 0),
         salesGrowth: typeof growthPct === 'number' ? growthPct : null,
         forecastAccuracy: accuracy > 0 ? accuracy : null,
         pendingOrders,
@@ -238,7 +244,7 @@ export default function OperationsDashboard() {
           onClick={() => navigate('/operations/sales-data')}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Monthly Sales</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-500">Total Revenue</CardTitle>
             <DollarSign className="h-4 w-4 text-gray-400" />
           </CardHeader>
           <CardContent>
@@ -246,10 +252,25 @@ export default function OperationsDashboard() {
             {metrics.salesThisMonth !== null ? formatCurrency(metrics.salesThisMonth) : 'No sales data'}
           </div>
             <p className="text-xs text-gray-500 mt-1">
-              {metrics.salesGrowth !== null
-                ? `+${metrics.salesGrowth}% from last month`
-                : 'No trend data available'}
+              Sold/stock-out minus procurement
+              {metrics.procurementDeductions > 0 ? ` (−${formatCurrency(metrics.procurementDeductions)})` : ''}
             </p>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className="hover:-translate-y-1 hover:shadow-md transition-all duration-300 dark:bg-neutral-900 border border-gray-100 dark:border-neutral-800 cursor-pointer"
+          onClick={() => navigate('/operations/demand-forecast')}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500">Prediction Revenue</CardTitle>
+            <Brain className="h-4 w-4 text-gray-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            {metrics.predictionRevenue !== null ? formatCurrency(metrics.predictionRevenue) : 'N/A'}
+          </div>
+            <p className="text-xs text-gray-500 mt-1">Forecast demand × unit price (30d)</p>
           </CardContent>
         </Card>
 
@@ -385,7 +406,9 @@ export default function OperationsDashboard() {
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-neutral-800">
                   {plansList.map((plan) => {
-                    const pct = Math.min(100, Math.round(((plan.completed_quantity || 0) / (plan.target_quantity || 1)) * 100));
+                    const pct = plan.status === 'completed'
+                      ? 100
+                      : Math.min(100, Math.round(((plan.completed_quantity || 0) / (plan.target_quantity || 1)) * 100));
                     const statusColors = {
                       scheduled: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-450',
                       in_progress: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-455',

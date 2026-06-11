@@ -257,6 +257,67 @@ export const handleGetAdminDashboard = async (req, res) => {
       alerts = [];
     }
 
+    let securityAlerts = [];
+    try {
+      const failedRows = await query(
+        `
+          SELECT a.id, a.created_at, a.details, u.email, u.name
+          FROM audit_logs a
+          LEFT JOIN users u ON u.id = a.user_id
+          WHERE a.action = 'LOGIN_FAILED'
+            AND a.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+          ORDER BY a.created_at DESC
+          LIMIT 5
+        `
+      );
+      securityAlerts = (failedRows || []).map((row) => {
+        let details = {};
+        try {
+          details = typeof row.details === 'string' ? JSON.parse(row.details) : row.details || {};
+        } catch {
+          details = {};
+        }
+        const email = details.email || row.email || 'unknown user';
+        return {
+          id: `login-fail-${row.id}`,
+          alert_type: 'login_failed',
+          severity: 'high',
+          message: `Failed login attempt for ${email}${details.reason ? ` (${details.reason})` : ''}`,
+          created_at: row.created_at,
+        };
+      });
+
+      const forgotRows = await query(
+        `
+          SELECT a.id, a.created_at, a.details
+          FROM audit_logs a
+          WHERE a.action = 'FORGOT_PASSWORD'
+            AND a.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+          ORDER BY a.created_at DESC
+          LIMIT 3
+        `
+      ).catch(() => []);
+      for (const row of forgotRows || []) {
+        let details = {};
+        try {
+          details = typeof row.details === 'string' ? JSON.parse(row.details) : row.details || {};
+        } catch {
+          details = {};
+        }
+        securityAlerts.push({
+          id: `forgot-${row.id}`,
+          alert_type: 'password_reset',
+          severity: 'medium',
+          message: `Password reset requested for ${details.email || 'a user'}`,
+          created_at: row.created_at,
+        });
+      }
+    } catch {
+      securityAlerts = [];
+    }
+
+    alerts = [...securityAlerts, ...(alerts || [])].slice(0, 15);
+
     // Recent activity from audit_logs
     const activityRows = await query(
       `

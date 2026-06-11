@@ -391,8 +391,10 @@ export default function ProductionPlan() {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {plans.length > 0 ? plans.map((plan) => {
-                const progress = plan.target_quantity > 0 
-                  ? (plan.completed_quantity / plan.target_quantity) * 100 
+                const progress = plan.status === 'completed'
+                  ? 100
+                  : plan.target_quantity > 0
+                  ? Math.min(100, (plan.completed_quantity / plan.target_quantity) * 100)
                   : 0;
                 const available = plan.available_stock ?? plan.current_stock ?? 0;
                 const safety = plan.safety_stock ?? 0;

@@ -95,16 +95,40 @@ export const handleCreateProduct = async (req, res) => {
       [sku, name, description || null, category || null, unit_price, unit_cost, lead_time_days || 7, reorder_point || 100, safety_stock || 50]
     );
 
-    // Initialize inventory
-    await query('INSERT INTO inventory (product_id, current_stock, reserved_stock) VALUES (?, 0, 0)', [result.insertId]);
+    const productId = result.insertId;
+    const initialQty = Number(body.initial_quantity || 0);
+    await query(
+      'INSERT INTO inventory (product_id, current_stock, reserved_stock) VALUES (?, ?, 0)',
+      [productId, initialQty]
+    );
 
-    await logAudit(req.user.id, 'CREATE_PRODUCT', 'product', result.insertId, { sku, name }, req);
+    const autoCreatePo = body.auto_create_po !== false && initialQty <= 0;
+    if (autoCreatePo) {
+      const orderQty = Math.max(Number(body.order_quantity || reorder_point || 100), 1);
+      const totalCost = orderQty * Number(unit_cost);
+      await query(
+        `INSERT INTO procurement_orders (product_id, supplier_name, quantity, unit_cost, total_cost, order_date, expected_delivery, status, notes, created_by)
+         VALUES (?, ?, ?, ?, ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 14 DAY), 'pending', ?, ?)`,
+        [
+          productId,
+          body.supplier_name || 'Kinglion Rwanda Main Supplier',
+          orderQty,
+          unit_cost,
+          totalCost,
+          `Auto order for new product with zero stock${body.warehouse ? ` — Warehouse: ${body.warehouse}` : ''}`,
+          req.user?.id || null,
+        ]
+      ).catch(() => {});
+    }
+
+    await logAudit(req.user.id, 'CREATE_PRODUCT', 'product', productId, { sku, name, warehouse: body.warehouse || null, auto_create_po: autoCreatePo }, req);
 
     sendJSON(res, 201, {
       success: true,
       product: {
-        id: result.insertId,
-        ...body
+        id: productId,
+        ...body,
+        auto_order_created: autoCreatePo,
       }
     });
   } catch (error) {

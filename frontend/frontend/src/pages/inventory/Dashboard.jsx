@@ -44,6 +44,7 @@ export default function InventoryDashboard() {
   const [recentActivity, setRecentActivity] = useState([]);
   const [replenishingIds, setReplenishingIds] = useState({});
   const [aiRecommendations, setAiRecommendations] = useState([]);
+  const [openProcurementProductIds, setOpenProcurementProductIds] = useState(new Set());
 
   const reorderSuggestions = useMemo(() => {
     const recByProduct = new Map(
@@ -52,6 +53,8 @@ export default function InventoryDashboard() {
 
     return inventory
       .filter(item => {
+        const productId = Number(item.product_id || item.id);
+        if (openProcurementProductIds.has(productId)) return false;
         const avail = item.available_stock ?? item.current_stock ?? 0;
         const reorder = item.reorder_point || 100;
         return avail <= reorder;
@@ -74,7 +77,7 @@ export default function InventoryDashboard() {
           reason: rec?.reasoning || (avail <= safety ? 'Below Safety Stock: Immediate stockout risk.' : 'Below Reorder Point: Replenishment advised.')
         };
       });
-  }, [inventory, aiRecommendations]);
+  }, [inventory, aiRecommendations, openProcurementProductIds]);
 
   const handleAutoReplenish = async (item) => {
     setReplenishingIds(prev => ({ ...prev, [item.id]: true }));
@@ -120,14 +123,22 @@ export default function InventoryDashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const [inventoryData, alertsData, dashboardInventory, forecastData, auditData, recsData] = await Promise.all([
+      const [inventoryData, alertsData, dashboardInventory, forecastData, auditData, recsData, procurementData] = await Promise.all([
         apiGet('/api/inventory').catch(() => ({ inventory: [] })),
         apiGet('/api/inventory/alerts?severity=high').catch(() => ({ alerts: [] })),
         apiGet('/api/dashboard/inventory').catch(() => null),
         apiGet('/api/dashboard/forecast-chart?days=90').catch(() => ({ chartData: [] })),
         apiGet('/api/audit?limit=10&entity_type=inventory').catch(() => ({ logs: [] })),
-        apiGet('/api/forecast/recommendations').catch(() => ({ recommendations: [] }))
+        apiGet('/api/forecast/recommendations').catch(() => ({ recommendations: [] })),
+        apiGet('/api/procurement').catch(() => [])
       ]);
+
+      const openPoProductIds = new Set(
+        (Array.isArray(procurementData) ? procurementData : procurementData?.data || [])
+          .filter((o) => !['cancelled'].includes(String(o.status || '').toLowerCase()))
+          .map((o) => Number(o.product_id))
+      );
+      setOpenProcurementProductIds(openPoProductIds);
 
       setInventory(inventoryData.inventory || []);
       setAiRecommendations(recsData?.recommendations || []);
@@ -179,6 +190,7 @@ export default function InventoryDashboard() {
     aCategoryCount: abcSummary?.a_count ?? 0,
     bCategoryCount: abcSummary?.b_count ?? 0,
     cCategoryCount: abcSummary?.c_count ?? 0,
+    stockFlow: inventoryDashboard?.stockFlow ?? { stock_in: 0, stock_out: 0, sold: 0, ordered: 0 },
     productsWithForecast: inventoryDashboard?.productsWithForecast ?? 0,
     totalForecastedDemand: inventoryDashboard?.totalForecastedDemand ?? 0
   };
@@ -373,6 +385,23 @@ export default function InventoryDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{metrics.forecastMAE}</div>
             <p className="text-xs text-muted-foreground mt-1">Mean absolute forecast error</p>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Stock Flow (30d)</CardTitle>
+            <div className="p-2 rounded-lg bg-sky-50">
+              <Activity className="h-4 w-4 text-sky-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm space-y-1">
+              <div className="flex justify-between"><span>In</span><span className="font-bold text-green-600">+{metrics.stockFlow.stock_in}</span></div>
+              <div className="flex justify-between"><span>Out</span><span className="font-bold text-red-600">-{metrics.stockFlow.stock_out}</span></div>
+              <div className="flex justify-between"><span>Sold</span><span className="font-bold">{metrics.stockFlow.sold}</span></div>
+              <div className="flex justify-between"><span>Ordered</span><span className="font-bold">{metrics.stockFlow.ordered}</span></div>
+            </div>
           </CardContent>
         </Card>
 

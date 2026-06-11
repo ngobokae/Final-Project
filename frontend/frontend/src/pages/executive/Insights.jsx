@@ -163,12 +163,33 @@ export default function Insights() {
       const metrics = raw.data || raw || {};
 
       const seasonality = metrics.seasonalityData || [];
-      const market = seasonality.map((row) => ({
+      let market = seasonality.map((row) => ({
         category: new Date(2000, (row.month || 1) - 1, 1).toLocaleDateString('en-US', { month: 'short' }),
         growth: (row.avg_seasonality || 0) * 100,
         marketShare: 0,
         trend: (row.avg_seasonality || 0) >= 1 ? 'up' : 'down'
       }));
+
+      try {
+        const catRes = await fetch('http://localhost:3001/api/dashboard/category-performance?days=90', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (catRes.ok) {
+          const catRaw = await catRes.json();
+          const perf = catRaw.performance || [];
+          const totalRev = perf.reduce((s, p) => s + Number(p.revenue || 0), 0);
+          if (perf.length > 0) {
+            market = perf.slice(0, 8).map((p) => ({
+              category: p.category || 'Uncategorized',
+              growth: Number(p.revenue || 0),
+              marketShare: totalRev > 0 ? Math.round((Number(p.revenue || 0) / totalRev) * 1000) / 10 : 0,
+              trend: Number(p.forecast_revenue || 0) >= Number(p.revenue || 0) ? 'up' : 'down',
+            }));
+          }
+        }
+      } catch {
+        // keep seasonality fallback
+      }
       setMarketData(market);
 
       const modelPerf = metrics.modelPerformance || [];

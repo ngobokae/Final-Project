@@ -166,6 +166,32 @@ export const generateAlertsFromInventory = async () => {
       const available = Number.isFinite(computedAvailable)
         ? computedAvailable
         : Number(item.available_stock ?? item.current_stock ?? 0);
+
+      const openPoRows = await query(
+        `
+          SELECT id, status FROM procurement_orders
+          WHERE product_id = ?
+            AND status IN ('pending', 'approved', 'in_transit', 'delayed', 'delivered')
+          ORDER BY id DESC LIMIT 1
+        `,
+        [item.product_id]
+      ).catch(() => []);
+
+      const openPo = openPoRows?.[0];
+      if (openPo?.id) {
+        await query(
+          `
+            UPDATE alerts
+            SET is_resolved = TRUE, resolved_at = NOW()
+            WHERE product_id = ?
+              AND is_resolved = FALSE
+              AND alert_type IN ('shortage', 'reorder', 'forecast_anomaly')
+          `,
+          [item.product_id]
+        ).catch(() => {});
+        continue;
+      }
+
       const safetyStock = item.safety_stock || 0;
       const reorderPoint = item.reorder_point || 100;
       let stockSignal = 'normal';

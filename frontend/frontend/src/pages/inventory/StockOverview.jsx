@@ -37,12 +37,15 @@ export default function StockOverview() {
     name: '',
     description: '',
     category: '',
+    warehouse: 'Zone A',
     unit_price: '',
     unit_cost: '',
     reorder_point: '',
     safety_stock: '',
-    lead_time_days: '7'
+    lead_time_days: '7',
+    order_quantity: ''
   });
+  const warehouses = ['Zone A', 'Zone B', 'Zone C', 'Zone D', 'Main Warehouse'];
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -121,22 +124,42 @@ export default function StockOverview() {
     }
 
     try {
-      await apiPost('/api/products', productForm);
+      const payload = {
+        ...productForm,
+        initial_quantity: 0,
+        auto_create_po: true,
+        order_quantity: Number(productForm.order_quantity || productForm.reorder_point || 100),
+        description: productForm.warehouse
+          ? `Warehouse: ${productForm.warehouse}${productForm.description ? ` — ${productForm.description}` : ''}`
+          : productForm.description,
+      };
+      const res = await apiPost('/api/products', payload);
       await fetchProducts();
       await fetchInventory();
       setShowAddProductModal(false);
+      window.dispatchEvent(new Event('app:operations-data-updated'));
+      window.dispatchEvent(new CustomEvent('app:toast', {
+        detail: {
+          type: 'success',
+          title: 'Product Added',
+          description: res?.product?.auto_order_created
+            ? `${productForm.name} created with zero stock — procurement order sent to Operations.`
+            : `${productForm.name} created successfully.`,
+        },
+      }));
       setProductForm({
         sku: '',
         name: '',
         description: '',
         category: '',
+        warehouse: 'Zone A',
         unit_price: '',
         unit_cost: '',
         reorder_point: '',
         safety_stock: '',
-        lead_time_days: '7'
+        lead_time_days: '7',
+        order_quantity: ''
       });
-      alert('Product created successfully');
     } catch (error) {
       console.error('Failed to create product:', error);
       alert(error.message || 'Failed to create product. Please try again.');
@@ -412,13 +435,15 @@ export default function StockOverview() {
             <RefreshCcw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          {(userRole === 'operations' || userRole === 'admin') && (
+          {(userRole === 'operations' || userRole === 'admin' || userRole === 'inventory' || userRole === 'inventory_manager') && (
             <>
-              <Button variant="outline" onClick={() => setShowUploadModal(true)}>
-                <Upload className="w-4 h-4 mr-2" />
-                Upload Products
-              </Button>
-              <Button variant="outline" onClick={() => setShowAddProductModal(true)}>
+              {(userRole === 'operations' || userRole === 'admin') && (
+                <Button variant="outline" onClick={() => setShowUploadModal(true)}>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Products
+                </Button>
+              )}
+              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setShowAddProductModal(true)}>
                 <Plus className="w-4 h-4 mr-2" />
                 Add Product
               </Button>
@@ -427,14 +452,6 @@ export default function StockOverview() {
           <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={handleGenerateStockReport}>
             <Download className="w-4 h-4 mr-2" />
             Generate Report
-          </Button>
-          <Button 
-            variant="outline" 
-            className="border-red-200 text-red-700 hover:bg-red-50"
-            onClick={() => setShowAddStockModal(true)}
-          >
-            <RefreshCcw className="w-4 h-4 mr-2" />
-            Counting & Adjustment
           </Button>
         </div>
       </div>
@@ -944,6 +961,30 @@ export default function StockOverview() {
                   placeholder="Product description"
                 />
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Warehouse *</label>
+                  <select
+                    value={productForm.warehouse}
+                    onChange={(e) => setProductForm({ ...productForm, warehouse: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    {warehouses.map((w) => (
+                      <option key={w} value={w}>{w}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Order Quantity (auto PO)</label>
+                  <Input
+                    type="number"
+                    value={productForm.order_quantity}
+                    onChange={(e) => setProductForm({ ...productForm, order_quantity: e.target.value })}
+                    placeholder="Units to order at zero stock"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-500">New products start at 0 stock. A procurement order is sent to Operations automatically.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
