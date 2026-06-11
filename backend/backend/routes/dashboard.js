@@ -669,18 +669,17 @@ export const handleGetCategoryPerformance = async (req, res) => {
       const salesRow = (categoryData || []).find(c => (c.category || 'Uncategorized') === cat);
       const rev = Number(salesRow?.revenue) || 0;
       const fc = forecastMap[cat] || { forecast_revenue: 0, forecast_units: 0 };
-      const combined = rev + fc.forecast_revenue;
       return {
         category: cat,
         revenue: rev,
         forecast_revenue: fc.forecast_revenue,
         forecast_units: fc.forecast_units,
-        target: Math.max((rev || 1) * 1.1, combined * 1.05),
+        target: Math.max((rev || 1) * 1.1, 1),
         growth: 0,
         margin: salesRow?.avg_margin || 0,
         units_sold: salesRow?.units_sold || 0
       };
-    }).filter(p => p.revenue > 0 || p.forecast_revenue > 0).sort((a, b) => (b.revenue + b.forecast_revenue) - (a.revenue + a.forecast_revenue));
+    }).filter(p => p.revenue > 0 || p.forecast_revenue > 0).sort((a, b) => b.revenue - a.revenue);
 
     sendJSON(res, 200, { performance });
   } catch (error) {
@@ -772,8 +771,8 @@ export const handleGetRevenueProfitTrend = async (req, res) => {
     const trend = sorted.map(row => ({
       date: row.date,
       month: new Date(row.date + 'Z').toLocaleDateString('en-US', { month: 'short' }),
-      revenue: row.revenue_actual + row.revenue_forecast,
-      profit: row.profit_actual + row.profit_forecast,
+      revenue: row.revenue_actual,
+      profit: row.profit_actual,
       revenue_actual: row.revenue_actual,
       revenue_forecast: row.revenue_forecast,
       profit_actual: row.profit_actual,

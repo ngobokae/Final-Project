@@ -5,6 +5,7 @@ import Busboy from 'busboy';
 import ExcelJS from 'exceljs';
 import path from 'path';
 import { recalculateAndPersistKPIs } from './kpis.js';
+import { calculateNetRevenueMetrics, calculatePredictionRevenue } from '../utils/revenueMetrics.js';
 
 async function parseExcelBuffer(buffer) {
   const workbook = new ExcelJS.Workbook();
@@ -146,12 +147,19 @@ export const handleGetSalesStats = async (req, res) => {
     }
 
     const [stats] = await query(sql, params);
+    const revenueMetrics = await calculateNetRevenueMetrics(days);
+    const prediction30 = await calculatePredictionRevenue(30);
 
     sendJSON(res, 200, {
       totalRecords: stats?.totalRecords || 0,
       totalQuantity: stats?.totalQuantity || 0,
-      totalRevenue: stats?.totalRevenue || 0,
-      avgOrderValue: stats?.avgOrderValue || 0
+      totalRevenue: revenueMetrics.net_revenue,
+      netRevenue: revenueMetrics.net_revenue,
+      actualRevenue: revenueMetrics.actual_revenue,
+      salesRevenue: revenueMetrics.sales_revenue,
+      procurementDeductions: revenueMetrics.procurement_deductions,
+      predictionRevenue: prediction30.prediction_revenue,
+      avgOrderValue: stats?.avgOrderValue || 0,
     });
   } catch (error) {
     console.error('Get sales stats error:', error);
@@ -609,7 +617,19 @@ export const handleUploadSales = async (req, res) => {
         FROM sales
         WHERE sale_date >= DATE_SUB(CURDATE(), INTERVAL 365 DAY)
       `);
-      stats = statsRows && statsRows[0] ? statsRows[0] : { total_sales: 0, total_quantity: 0, total_revenue: 0 };
+      const row = statsRows && statsRows[0] ? statsRows[0] : { total_sales: 0, total_quantity: 0, total_revenue: 0 };
+      const revenueMetrics = await calculateNetRevenueMetrics(365);
+      const prediction30 = await calculatePredictionRevenue(30);
+      stats = {
+        totalRecords: row.total_sales || 0,
+        totalQuantity: row.total_quantity || 0,
+        totalRevenue: revenueMetrics.net_revenue,
+        netRevenue: revenueMetrics.net_revenue,
+        actualRevenue: revenueMetrics.actual_revenue,
+        salesRevenue: revenueMetrics.sales_revenue,
+        procurementDeductions: revenueMetrics.procurement_deductions,
+        predictionRevenue: prediction30.prediction_revenue,
+      };
     }
 
     // Refresh KPI snapshot after a bulk sales upload.

@@ -246,7 +246,7 @@ export default function ExecutiveDashboard() {
 
       const trendSeries = revenueProfitRes?.trend || [];
       const revenueSpark = trendSeries.length > 0
-        ? trendSeries.slice(-7).map(t => t.revenue || 0)
+        ? trendSeries.slice(-7).map(t => t.revenue_actual ?? t.revenue ?? 0)
         : (revenue > 0 ? [0, 0, 0, 0, 0, 0, revenue] : [0]);
       const ordersSpark = trendSeries.length > 0
         ? trendSeries.slice(-7).map(t => t.orders || 0)
@@ -364,8 +364,10 @@ export default function ExecutiveDashboard() {
   const revenueTrendData = revenueProfitTrend.length > 0
     ? revenueProfitTrend.map((row) => ({
         month: row.month || new Date(row.date).toLocaleDateString('en-US', { month: 'short' }),
-        revenue: row.revenue || 0,
-        profit: row.profit || 0,
+        revenue: row.revenue_actual ?? row.revenue ?? 0,
+        revenue_forecast: row.revenue_forecast || 0,
+        profit: row.profit_actual ?? row.profit ?? 0,
+        profit_forecast: row.profit_forecast || 0,
         orders: row.orders || 0
       }))
     : salesChart.map((item) => ({
@@ -553,7 +555,7 @@ export default function ExecutiveDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                 <CardTitle>Revenue & Profit Trends</CardTitle>
-                <CardDescription>Actual + forecast (post-prediction). Past from sales, future from forecast.</CardDescription>
+                <CardDescription>Actual sales (solid) vs prediction revenue (dashed). Kept separate — not combined.</CardDescription>
                 </div>
                 <Select value={selectedMetric} onValueChange={setSelectedMetric}>
                   <SelectTrigger className="w-[140px]">
@@ -581,6 +583,10 @@ export default function ExecutiveDashboard() {
                           <stop offset="0%" stopColor={chartTheme.areaFillStart} stopOpacity={0.8} />
                           <stop offset="100%" stopColor={chartTheme.areaFillEnd} stopOpacity={0.2} />
                         </linearGradient>
+                        <linearGradient id="areaGradient-revenue-forecast" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#8884d8" stopOpacity={0.5} />
+                          <stop offset="100%" stopColor="#8884d8" stopOpacity={0.1} />
+                        </linearGradient>
                       </defs>
                       <CartesianGrid {...gridProps} />
                       <XAxis dataKey="month" {...axisProps} />
@@ -592,14 +598,61 @@ export default function ExecutiveDashboard() {
                         formatter={(value) => (selectedMetric === 'orders' ? value : formatCurrency(value))}
                         {...tooltipProps}
                       />
-                      <Area
-                        type="monotone"
-                        dataKey={selectedMetric}
-                        stroke={chartTheme.lineColor}
-                        strokeWidth={2}
-                        fill="url(#areaGradient-revenue)"
-                        fillOpacity={chartTheme.areaFillOpacity}
-                      />
+                      <Legend verticalAlign="top" height={36} />
+                      {selectedMetric === 'revenue' ? (
+                        <>
+                          <Area
+                            name="Actual Revenue"
+                            type="monotone"
+                            dataKey="revenue"
+                            stroke={chartTheme.lineColor}
+                            strokeWidth={2}
+                            fill="url(#areaGradient-revenue)"
+                            fillOpacity={chartTheme.areaFillOpacity}
+                          />
+                          <Area
+                            name="Prediction Revenue"
+                            type="monotone"
+                            dataKey="revenue_forecast"
+                            stroke="#8884d8"
+                            strokeWidth={2}
+                            strokeDasharray="5 5"
+                            fill="url(#areaGradient-revenue-forecast)"
+                            fillOpacity={0.25}
+                          />
+                        </>
+                      ) : selectedMetric === 'profit' ? (
+                        <>
+                          <Area
+                            name="Actual Profit"
+                            type="monotone"
+                            dataKey="profit"
+                            stroke={chartTheme.lineColor}
+                            strokeWidth={2}
+                            fill="url(#areaGradient-revenue)"
+                            fillOpacity={chartTheme.areaFillOpacity}
+                          />
+                          <Area
+                            name="Prediction Profit"
+                            type="monotone"
+                            dataKey="profit_forecast"
+                            stroke="#8884d8"
+                            strokeWidth={2}
+                            strokeDasharray="5 5"
+                            fill="url(#areaGradient-revenue-forecast)"
+                            fillOpacity={0.25}
+                          />
+                        </>
+                      ) : (
+                        <Area
+                          type="monotone"
+                          dataKey={selectedMetric}
+                          stroke={chartTheme.lineColor}
+                          strokeWidth={2}
+                          fill="url(#areaGradient-revenue)"
+                          fillOpacity={chartTheme.areaFillOpacity}
+                        />
+                      )}
                     </AreaChart>
                   );
                 })() : (
@@ -617,15 +670,16 @@ export default function ExecutiveDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle>Category Performance</CardTitle>
-                <CardDescription>Revenue by category (sales + forecast)</CardDescription>
+                <CardDescription>Actual sales revenue by category (prediction shown separately)</CardDescription>
               </CardHeader>
               <CardContent>
                   <div className="space-y-4">
                   {categoryPerformance.length > 0 ? categoryPerformance.map((category, index) => {
-                    const combined = (category.revenue || 0) + (category.forecast_revenue || 0);
-                    const target = category.target || combined * 1.1;
-                    const performance = target > 0 ? Math.min(100, Math.round((combined / target) * 100)) : 0;
-                    const isAboveTarget = combined >= target;
+                    const actualRev = Number(category.revenue) || 0;
+                    const forecastRev = Number(category.forecast_revenue) || 0;
+                    const target = category.target || actualRev * 1.1;
+                    const performance = target > 0 ? Math.min(100, Math.round((actualRev / target) * 100)) : 0;
+                    const isAboveTarget = actualRev >= target;
 
                     return (
                       <div key={index} className="space-y-2">
@@ -638,9 +692,11 @@ export default function ExecutiveDashboard() {
                               {category.growth >= 0 ? '+' : ''}{category.growth}%
                             </span>
                             <span className="text-muted-foreground">
-                              {formatCurrency(combined)}
-                              {(category.forecast_revenue || 0) > 0 && (
-                                <span className="text-xs ml-1">(incl. forecast)</span>
+                              {formatCurrency(actualRev)}
+                              {forecastRev > 0 && (
+                                <span className="text-xs ml-1 text-indigo-600 dark:text-indigo-400">
+                                  (pred. {formatCurrency(forecastRev)})
+                                </span>
                               )}
                             </span>
                           </div>

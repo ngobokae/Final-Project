@@ -1,5 +1,6 @@
 import { query } from '../config/database.js';
 import { sendJSON, sendError, parseBody, parseQuery } from '../utils/helpers.js';
+import { calculateNetRevenueMetrics, calculatePredictionRevenue } from '../utils/revenueMetrics.js';
 
 // Operations Reports
 export const handleGenerateSalesReport = async (req, res) => {
@@ -488,6 +489,9 @@ export const handleGenerateExecutiveSummary = async (req, res) => {
       WHERE sale_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
     `, [days]);
 
+    const revenueMetrics = await calculateNetRevenueMetrics(days);
+    const prediction30 = await calculatePredictionRevenue(30);
+
     const [productionSummary] = await query(`
       SELECT 
         COUNT(*) as plans,
@@ -565,7 +569,15 @@ export const handleGenerateExecutiveSummary = async (req, res) => {
       report: {
         type: 'executive_summary',
         period: days,
-        sales: salesSummary || {},
+        sales: {
+          ...(salesSummary || {}),
+          gross_sales_revenue: Number(salesSummary?.revenue || 0),
+          revenue: revenueMetrics.net_revenue,
+          net_revenue: revenueMetrics.net_revenue,
+          actual_revenue: revenueMetrics.actual_revenue,
+          prediction_revenue: prediction30.prediction_revenue,
+          procurement_deductions: revenueMetrics.procurement_deductions,
+        },
         production: productionSummary || {},
         inventory: inventorySummary || {},
         procurement: procurementSummary || {},

@@ -511,7 +511,9 @@ export default function SalesData() {
     exportToCSV(); // Fallback to CSV for now
   };
 
-  const totalRevenue = Number(stats?.totalRevenue || 0);
+  const netRevenue = Number(stats?.netRevenue ?? stats?.totalRevenue ?? 0);
+  const predictionRevenue = Number(stats?.predictionRevenue ?? 0);
+  const procurementDeductions = Number(stats?.procurementDeductions ?? 0);
   const totalUnits = Number(stats?.totalQuantity || 0);
   const totalRecords = Number(stats?.totalRecords || 0);
   const dataQuality = totalRecords > 0 ? 98.7 : 0;
@@ -647,12 +649,16 @@ export default function SalesData() {
             <DollarSign className="h-5 w-5 text-emerald-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(netRevenue)}</div>
             <p className="text-xs text-gray-500 mt-1">
-              {totalRevenue > 0 ? (
-                <span className="text-green-600 flex items-center gap-1"><TrendingUp className="h-3 w-3" /> From sales in selected period</span>
+              {netRevenue > 0 ? (
+                <span className="text-green-600 flex items-center gap-1">
+                  <TrendingUp className="h-3 w-3" />
+                  Sold/stock-out minus procurement
+                  {procurementDeductions > 0 ? ` (−${formatCurrency(procurementDeductions)})` : ''}
+                </span>
               ) : (
-                'No revenue in selected period'
+                'No actual revenue in selected period'
               )}
             </p>
           </CardContent>
@@ -688,12 +694,12 @@ export default function SalesData() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Forecasted (30D)</CardTitle>
+            <CardTitle className="text-sm font-medium">Prediction Revenue</CardTitle>
             <TrendingUp className="h-5 w-5 text-indigo-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(forecastMetrics?.totalRevenue || 0)}</div>
-            <p className="text-xs text-indigo-600 mt-1 font-medium italic">AI Projected revenue</p>
+            <div className="text-2xl font-bold">{formatCurrency(predictionRevenue)}</div>
+            <p className="text-xs text-indigo-600 mt-1 font-medium italic">Forecast demand × unit price (30d) — not actual sales</p>
           </CardContent>
         </Card>
       </div>

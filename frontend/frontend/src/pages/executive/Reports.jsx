@@ -50,8 +50,9 @@ export default function ExecutiveReports() {
       const data = await apiGet('/api/reports/executive-summary?days=30');
       if (data.report) {
         setMetrics({
-          revenue: data.report.sales?.revenue || 0,
-          profit: (data.report.sales?.revenue || 0) - (data.report.procurement?.delivered_spend || data.report.procurement?.total_spend || 0),
+          revenue: data.report.sales?.net_revenue ?? data.report.sales?.revenue ?? 0,
+          predictionRevenue: data.report.sales?.prediction_revenue ?? 0,
+          profit: (data.report.sales?.net_revenue ?? data.report.sales?.revenue ?? 0) - (data.report.procurement?.delivered_spend || data.report.procurement?.total_spend || 0),
           orders: data.report.sales?.transactions || 0,
           avgOrderValue: data.report.sales?.avg_order_value || 0
         });
