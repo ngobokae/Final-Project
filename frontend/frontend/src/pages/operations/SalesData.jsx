@@ -35,7 +35,7 @@ export default function SalesData() {
   const [predicting, setPredicting] = useState(false);
   const [predictProgress, setPredictProgress] = useState({ current: 0, total: 0 });
   const [demandModels, setDemandModels] = useState([]);
-  const [selectedModelId, setSelectedModelId] = useState('baseline');
+  const [selectedModelId, setSelectedModelId] = useState('ensemble');
   const [uploadedFiles, setUploadedFiles] = useState(() => {
     try {
       const saved = localStorage.getItem('sales_uploaded_files');
@@ -380,7 +380,7 @@ export default function SalesData() {
       setPredictProgress({ current: 0, total: 0 });
 
       const availableModels = demandModels.length ? demandModels : DEFAULT_DEMAND_MODELS;
-      const finalModelId = selectedModelId || availableModels[0]?.id || 'baseline';
+      const finalModelId = selectedModelId || availableModels[0]?.id || 'ensemble';
       const modelName = availableModels.find((m) => m.id === finalModelId)?.name || finalModelId;
 
       let uniqueProductIds = [];
@@ -467,7 +467,7 @@ export default function SalesData() {
       } else {
         const description = lastError?.message
           ? `No forecasts saved. ${lastError.message}`
-          : 'Each product needs at least one sales row in the database. Try Fast baseline model and upload again.';
+          : 'Each product needs at least one sales row in the database. Upload sales data and try again.';
         window.dispatchEvent(new CustomEvent('app:toast', {
           detail: { type: 'warning', title: 'No forecasts generated', description },
         }));
@@ -889,7 +889,7 @@ export default function SalesData() {
                     <div className="w-full md:max-w-xs">
                       <div className="text-xs font-semibold text-emerald-800 uppercase">AI Model</div>
                       <Select
-                        value={selectedModelId || (demandModels[0] || DEFAULT_DEMAND_MODELS[0])?.id || 'baseline'}
+                        value={selectedModelId || (demandModels[0] || DEFAULT_DEMAND_MODELS[0])?.id || 'ensemble'}
                         onValueChange={setSelectedModelId}
                       >
                         <SelectTrigger className="mt-1 border-emerald-200 dark:border-neutral-600 bg-white dark:bg-neutral-900">

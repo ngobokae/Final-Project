@@ -89,6 +89,8 @@ class ForecastView(APIView):
             historical_data = request.data.get('historical_data', [])
             days_ahead = int(request.data.get('days_ahead', 30))
             model_type = str(request.data.get('model_type', 'ensemble')).lower()
+            if model_type not in {'ensemble', 'prophet', 'lstm'}:
+                model_type = 'ensemble'
 
             if not product_id:
                 return Response({'error': 'product_id is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -121,14 +123,11 @@ class ForecastView(APIView):
 
     def _generate_forecast(self, df, days_ahead, model_type='ensemble'):
         model_type = str(model_type or 'ensemble').lower()
-        if model_type == 'baseline':
-            return self._forecast_baseline(df, days_ahead, source='baseline')
-        if model_type == 'arima':
-            return self._forecast_arima(df, days_ahead)
+        allowed = {'ensemble', 'prophet', 'lstm'}
+        if model_type not in allowed:
+            model_type = 'ensemble'
         if model_type == 'prophet':
             return self._forecast_prophet(df, days_ahead)
-        if model_type == 'random_forest':
-            return self._forecast_random_forest(df, days_ahead)
         if model_type == 'lstm':
             return self._forecast_lstm(df, days_ahead)
 
@@ -280,7 +279,7 @@ class ForecastView(APIView):
             return self._forecast_baseline(df, days_ahead, source='lstm')
 
     def _forecast_ensemble(self, df, days_ahead):
-        methods = ['arima', 'prophet', 'random_forest', 'lstm']
+        methods = ['prophet', 'lstm']
         candidate_forecasts = {}
 
         for method in methods:

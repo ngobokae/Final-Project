@@ -128,21 +128,14 @@ export const handleGetCategories = async (req, res) => {
 };
 
 // Defaults for demand models (same as demandModels.js)
+const ALLOWED_MODEL_IDS = ['ensemble', 'prophet', 'lstm'];
 const DEFAULT_MODELS = [
   {
     id: 'ensemble',
     name: 'Ensemble (Best)',
     type: 'Hybrid',
-    description: 'Combines ARIMA, Prophet, Random Forest, and LSTM models for robust demand forecasting.',
+    description: 'Combines Prophet and LSTM models for robust demand forecasting.',
     accuracy: 96.2,
-    active: true,
-  },
-  {
-    id: 'arima',
-    name: 'ARIMA',
-    type: 'Time Series',
-    description: 'Autoregressive Integrated Moving Average model for trend and seasonality.',
-    accuracy: 93.5,
     active: true,
   },
   {
@@ -151,14 +144,6 @@ const DEFAULT_MODELS = [
     type: 'Time Series',
     description: 'Additive decomposable model designed for business seasonality.',
     accuracy: 92.4,
-    active: true,
-  },
-  {
-    id: 'random_forest',
-    name: 'Random Forest',
-    type: 'Machine Learning',
-    description: 'Tree-based model that learns demand patterns from lagged sales features.',
-    accuracy: 90.3,
     active: true,
   },
   {
@@ -365,13 +350,20 @@ export const handleGetAdminDashboard = async (req, res) => {
       );
       if (rows.length) {
         const parsed = JSON.parse(rows[0].setting_value);
-        configuredModels = Array.isArray(parsed) ? parsed : [];
+        configuredModels = Array.isArray(parsed)
+          ? parsed.filter((m) => m && ALLOWED_MODEL_IDS.includes(m.id))
+          : [];
       }
     } catch {
       configuredModels = [];
     }
 
-    const allModels = (configuredModels.length ? configuredModels : DEFAULT_MODELS).map((m) => ({
+    const mergedModels = DEFAULT_MODELS.map((defaultModel) => {
+      const stored = configuredModels.find((m) => m.id === defaultModel.id);
+      return stored ? { ...defaultModel, ...stored, id: defaultModel.id } : defaultModel;
+    });
+
+    const allModels = mergedModels.map((m) => ({
       id: m.id,
       name: m.name,
       type: m.type,

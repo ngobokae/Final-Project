@@ -8,6 +8,13 @@ import Busboy from 'busboy';
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
 
+const ALLOWED_MODEL_TYPES = new Set(['ensemble', 'prophet', 'lstm']);
+
+const normalizeModelType = (modelType) => {
+  const normalized = String(modelType || 'ensemble').toLowerCase();
+  return ALLOWED_MODEL_TYPES.has(normalized) ? normalized : 'ensemble';
+};
+
 let forecastSchemaEnsured = false;
 
 /** Creates forecast_file_uploads and related tables if missing (Manaf1.sql does not include them). */
@@ -117,6 +124,8 @@ const countMatchedProducts = async (productIdentifiers) => {
 };
 
 const generateAndSaveForecastsFromProductMap = async (byProduct, daysAhead = 30, modelType = 'ensemble') => {
+  const resolvedModelType = normalizeModelType(modelType);
+
   const productEntries = Object.entries(byProduct);
   const mlPromises = productEntries.map(async ([productId, items]) => {
     try {
@@ -132,7 +141,7 @@ const generateAndSaveForecastsFromProductMap = async (byProduct, daysAhead = 30,
         product_id: productId,
         historical_data: historicalData,
         days_ahead: daysAhead,
-        model_type: modelType,
+        model_type: resolvedModelType,
       });
 
       if (mlResponse?.forecasts && Array.isArray(mlResponse.forecasts)) {
@@ -490,6 +499,7 @@ export const handleGenerateForecast = async (req, res) => {
   try {
     const body = await parseBody(req);
     const { product_id, days_ahead = 30, model_type = 'ensemble', bulk_mode = false } = body;
+    const resolvedModelType = normalizeModelType(model_type);
 
     if (!product_id) {
       return sendError(res, 400, 'product_id is required');
@@ -512,7 +522,7 @@ export const handleGenerateForecast = async (req, res) => {
       product_id,
       historical_data: salesData,
       days_ahead,
-      model_type
+      model_type: resolvedModelType
     });
 
     // Store forecast results in database
@@ -538,7 +548,7 @@ export const handleGenerateForecast = async (req, res) => {
       );
     }
 
-    await logAudit(req.user.id, 'GENERATE_FORECAST', 'forecast', product_id, { days_ahead, model_type }, req);
+    await logAudit(req.user.id, 'GENERATE_FORECAST', 'forecast', product_id, { days_ahead, model_type: resolvedModelType }, req);
 
     // Skip heavy side effects during bulk "Predict 2" runs (done once at the end).
     if (!bulk_mode) {
@@ -567,7 +577,7 @@ export const handleGenerateForecast = async (req, res) => {
       forecasts: mlResponse.forecasts,
       saved_forecasts: savedForecasts,
       insights: mlResponse.insights,
-      model_type: mlResponse.model_type || model_type
+      model_type: mlResponse.model_type || resolvedModelType
     });
   } catch (error) {
     console.error('Generate forecast error:', error);
@@ -771,6 +781,7 @@ export const handlePredictFromUpload = async (req, res) => {
     await ensureForecastSchema();
     const body = await parseBody(req);
     const { file_upload_id, days_ahead = 30, model_type = 'ensemble' } = body;
+    const resolvedModelType = normalizeModelType(model_type);
 
     if (!file_upload_id) {
       return sendError(res, 400, 'file_upload_id is required');
@@ -799,7 +810,7 @@ export const handlePredictFromUpload = async (req, res) => {
     }
 
     console.log(`[Forecast Predict] Running predictions for upload ${file_upload_id} (${productCount} products)...`);
-    const forecastsSaved = await generateAndSaveForecastsFromProductMap(byProduct, days_ahead, model_type);
+    const forecastsSaved = await generateAndSaveForecastsFromProductMap(byProduct, days_ahead, resolvedModelType);
 
     await query(
       `UPDATE forecast_file_uploads SET status = 'processed', processed_at = NOW(), forecast_count = ? WHERE id = ?`,
@@ -811,7 +822,7 @@ export const handlePredictFromUpload = async (req, res) => {
       'PREDICT_FROM_UPLOAD',
       'forecast_file',
       file_upload_id,
-      { fileName: upload.file_name, forecastsSaved, days_ahead, model_type },
+      { fileName: upload.file_name, forecastsSaved, days_ahead, model_type: resolvedModelType },
       req
     );
 

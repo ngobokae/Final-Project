@@ -83,7 +83,7 @@ python manage.py runserver 8000
 2. Go to **Operations → Sales Data (Predict 2 – Sales)** → **Upload Data**.
 3. Upload CSV/Excel with columns such as `sku` or `product_name`, `sale_date` (or `date`), `quantity`, `unit_price`.
 4. After rows import, your file appears under **Uploaded documents** — then **Run Predict 2 (Sales)** is shown.
-5. Use **Fast baseline** for bulk runs (much faster than Ensemble). Results appear on the **Overview** tab (charts and **Forecasted 30D**).
+5. Choose **Ensemble**, **Prophet**, or **LSTM** before running predictions. Results appear on the **Overview** tab (charts and **Forecasted 30D**).
 6. **Demand Forecast** page uses stored forecasts for per-product demand planning.
 
 ## Project layout

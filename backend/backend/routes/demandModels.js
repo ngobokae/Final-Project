@@ -3,29 +3,15 @@ import { parseBody, sendJSON, sendError } from '../utils/helpers.js';
 
 const SETTING_KEY = 'demand_models';
 
+export const ALLOWED_MODEL_IDS = ['ensemble', 'prophet', 'lstm'];
+
 const DEFAULT_MODELS = [
-  {
-    id: 'baseline',
-    name: 'Fast baseline',
-    type: 'Statistical',
-    description: 'Quick moving-average forecast. Best for bulk Predict 2 runs.',
-    accuracy: 82.0,
-    active: true,
-  },
   {
     id: 'ensemble',
     name: 'Ensemble (Best)',
     type: 'Hybrid',
-    description: 'Combines ARIMA, Prophet, Random Forest, and LSTM models for robust demand forecasting.',
+    description: 'Combines Prophet and LSTM models for robust demand forecasting.',
     accuracy: 96.2,
-    active: true,
-  },
-  {
-    id: 'arima',
-    name: 'ARIMA',
-    type: 'Time Series',
-    description: 'Autoregressive Integrated Moving Average model for trend and seasonality.',
-    accuracy: 93.5,
     active: true,
   },
   {
@@ -34,14 +20,6 @@ const DEFAULT_MODELS = [
     type: 'Time Series',
     description: 'Additive decomposable model designed for business seasonality.',
     accuracy: 92.4,
-    active: true,
-  },
-  {
-    id: 'random_forest',
-    name: 'Random Forest',
-    type: 'Machine Learning',
-    description: 'Tree-based model that learns demand patterns from lagged sales features.',
-    accuracy: 90.3,
     active: true,
   },
   {
@@ -73,7 +51,7 @@ const normalizeModels = (models) => {
     if (!m || typeof m !== 'object') continue;
 
     const id = slugify(m.id || m.name);
-    if (!id || seen.has(id)) continue;
+    if (!id || seen.has(id) || !ALLOWED_MODEL_IDS.includes(id)) continue;
 
     const name = String(m.name || id).trim();
     if (!name) continue;
@@ -92,14 +70,23 @@ const normalizeModels = (models) => {
   return normalized;
 };
 
+const mergeWithDefaults = (models) => {
+  const byId = new Map((models || []).map((m) => [m.id, m]));
+  return DEFAULT_MODELS.map((defaultModel) => ({
+    ...defaultModel,
+    ...(byId.get(defaultModel.id) || {}),
+    id: defaultModel.id,
+  }));
+};
+
 const readStoredModels = async () => {
   const rows = await query('SELECT setting_value FROM system_settings WHERE setting_key = ? LIMIT 1', [SETTING_KEY]);
   if (!rows.length) return DEFAULT_MODELS;
 
   try {
     const parsed = JSON.parse(rows[0].setting_value);
-    const models = normalizeModels(parsed);
-    return models.length ? models : DEFAULT_MODELS;
+    const models = mergeWithDefaults(normalizeModels(parsed));
+    return models;
   } catch {
     return DEFAULT_MODELS;
   }
@@ -143,7 +130,7 @@ export const handleUpdateDemandModels = async (req, res) => {
     const body = await parseBody(req);
     const input = body.models ?? body.demand_models ?? body.demandModels;
 
-    const models = normalizeModels(input);
+    const models = mergeWithDefaults(normalizeModels(input));
     if (!models.length) {
       return sendError(res, 400, 'Invalid models list');
     }
@@ -155,4 +142,3 @@ export const handleUpdateDemandModels = async (req, res) => {
     sendError(res, 500, 'Failed to update demand models');
   }
 };
-
