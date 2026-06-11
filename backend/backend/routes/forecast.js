@@ -225,7 +225,7 @@ const generateAndSaveForecastsFromProductMap = async (byProduct, daysAhead = 30,
   return insertValues.length;
 };
 
-const callMLService = (endpoint, method = 'GET', data = null) => {
+const callMLService = (endpoint, method = 'GET', data = null, timeoutMs = 120000) => {
   return new Promise((resolve, reject) => {
     const url = new URL(`${ML_SERVICE_URL}${endpoint}`);
     const options = {
@@ -275,6 +275,10 @@ const callMLService = (endpoint, method = 'GET', data = null) => {
       });
     });
 
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error(`ML service timeout after ${timeoutMs}ms`));
+    });
+
     req.on('error', (error) => {
       reject(error);
     });
@@ -285,6 +289,54 @@ const callMLService = (endpoint, method = 'GET', data = null) => {
 
     req.end();
   });
+};
+
+const resolveUnitPrice = async (productId, fallbackFromSales = true) => {
+  const [productRow] = await query(
+    'SELECT unit_price FROM products WHERE id = ? LIMIT 1',
+    [productId]
+  );
+  let unitPrice = Number(productRow?.unit_price) || 0;
+  if (unitPrice <= 0 && fallbackFromSales) {
+    const [avgRow] = await query(
+      'SELECT AVG(unit_price) as avg_price FROM sales WHERE product_id = ? AND unit_price > 0',
+      [productId]
+    );
+    unitPrice = Number(avgRow?.avg_price) || 0;
+  }
+  return Math.round(unitPrice * 100) / 100;
+};
+
+const saveForecastRows = async (productId, forecasts, { unitPrice = 0, modelType = 'ensemble' } = {}) => {
+  if (!Array.isArray(forecasts) || !forecasts.length) return 0;
+
+  let saved = 0;
+  for (const forecast of forecasts) {
+    await query(
+      `INSERT INTO forecast_results 
+       (product_id, forecast_date, forecasted_demand, confidence_level, trend_indicator, seasonality_factor, unit_price, model)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+       forecasted_demand = VALUES(forecasted_demand),
+       confidence_level = VALUES(confidence_level),
+       trend_indicator = VALUES(trend_indicator),
+       seasonality_factor = VALUES(seasonality_factor),
+       unit_price = VALUES(unit_price),
+       model = VALUES(model)`,
+      [
+        productId,
+        forecast.date,
+        forecast.demand,
+        forecast.confidence || 0.95,
+        forecast.trend || 'stable',
+        forecast.seasonality || 1.0,
+        unitPrice,
+        modelType,
+      ]
+    );
+    saved += 1;
+  }
+  return saved;
 };
 
 // Shared helper to generate and persist an inventory recommendation for a single product.
@@ -383,6 +435,7 @@ const generateInventoryRecommendationForProduct = async (product_id, userId = nu
 
 export const handleGetForecasts = async (req, res) => {
   try {
+    await ensureForecastSchema();
     const queryParams = req.query || {};
     const productId = queryParams.product_id;
     const days = parseInt(queryParams.days, 10);
@@ -497,9 +550,11 @@ export const handleDeleteForecasts = async (req, res) => {
 
 export const handleGenerateForecast = async (req, res) => {
   try {
+    await ensureForecastSchema();
     const body = await parseBody(req);
     const { product_id, days_ahead = 30, model_type = 'ensemble', bulk_mode = false } = body;
     const resolvedModelType = normalizeModelType(model_type);
+    const effectiveDays = Math.min(Math.max(1, Number(days_ahead) || 30), 90);
 
     if (!product_id) {
       return sendError(res, 400, 'product_id is required');
@@ -517,36 +572,22 @@ export const handleGenerateForecast = async (req, res) => {
       return sendError(res, 400, 'No historical sales data available for this product');
     }
 
+    const unitPrice = await resolveUnitPrice(product_id);
+    const mlModelType = bulk_mode && resolvedModelType === 'ensemble' ? 'prophet' : resolvedModelType;
+    const mlTimeout = bulk_mode ? 45000 : 120000;
+
     // Call ML service
     const mlResponse = await callMLService('/api/forecast/', 'POST', {
       product_id,
       historical_data: salesData,
-      days_ahead,
-      model_type: resolvedModelType
-    });
+      days_ahead: effectiveDays,
+      model_type: mlModelType,
+      bulk_mode: Boolean(bulk_mode),
+    }, mlTimeout);
 
     // Store forecast results in database
     const forecasts = mlResponse.forecasts || [];
-    for (const forecast of forecasts) {
-      await query(
-        `INSERT INTO forecast_results 
-         (product_id, forecast_date, forecasted_demand, confidence_level, trend_indicator, seasonality_factor)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-         forecasted_demand = VALUES(forecasted_demand),
-         confidence_level = VALUES(confidence_level),
-         trend_indicator = VALUES(trend_indicator),
-         seasonality_factor = VALUES(seasonality_factor)`,
-        [
-          product_id,
-          forecast.date,
-          forecast.demand,
-          forecast.confidence || 0.95,
-          forecast.trend || 'stable',
-          forecast.seasonality || 1.0
-        ]
-      );
-    }
+    await saveForecastRows(product_id, forecasts, { unitPrice, modelType: resolvedModelType });
 
     await logAudit(req.user.id, 'GENERATE_FORECAST', 'forecast', product_id, { days_ahead, model_type: resolvedModelType }, req);
 
@@ -565,12 +606,13 @@ export const handleGenerateForecast = async (req, res) => {
     }
 
     const savedForecasts = await query(`
-      SELECT f.*, p.sku, p.name as product_name
+      SELECT f.*, p.sku, p.name as product_name, p.unit_price
       FROM forecast_results f
       JOIN products p ON f.product_id = p.id
-      WHERE f.product_id = ? AND f.forecast_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+      WHERE f.product_id = ? AND f.forecast_date >= CURDATE()
       ORDER BY f.forecast_date ASC
-    `, [product_id, Math.min(days_ahead, 365)]);
+      LIMIT ?
+    `, [product_id, effectiveDays]);
 
     sendJSON(res, 200, {
       success: true,
@@ -586,6 +628,106 @@ export const handleGenerateForecast = async (req, res) => {
       ? 'ML service is not running. Start it with: cd ml-service && python manage.py runserver (port 8000).'
       : `Failed to generate forecast: ${error.message}`;
     sendError(res, code, message);
+  }
+};
+
+/** Fast bulk predictions for Sales Data "Predict 2" — parallel, 30-day horizon, saves to forecast_results. */
+export const handleBulkGenerateForecast = async (req, res) => {
+  try {
+    await ensureForecastSchema();
+    const body = await parseBody(req);
+    const {
+      product_ids: rawIds = [],
+      days_ahead = 30,
+      model_type = 'prophet',
+    } = body;
+
+    const productIds = [...new Set((Array.isArray(rawIds) ? rawIds : [])
+      .map((id) => Number(id))
+      .filter((id) => Number.isFinite(id) && id > 0))].slice(0, 12);
+
+    if (!productIds.length) {
+      return sendError(res, 400, 'product_ids array is required');
+    }
+
+    const resolvedModelType = normalizeModelType(model_type);
+    const effectiveDays = Math.min(Math.max(1, Number(days_ahead) || 30), 30);
+    const mlModelType = resolvedModelType === 'ensemble' ? 'prophet' : resolvedModelType;
+    const concurrency = 3;
+
+    let generated = 0;
+    let skipped = 0;
+    let rowsSaved = 0;
+    const errors = [];
+
+    const runOne = async (productId) => {
+      const salesData = await query(
+        `SELECT sale_date, quantity, total_amount FROM sales WHERE product_id = ? ORDER BY sale_date ASC`,
+        [productId]
+      );
+      if (!salesData.length) {
+        skipped += 1;
+        return;
+      }
+
+      const unitPrice = await resolveUnitPrice(productId);
+      const mlResponse = await callMLService(
+        '/api/forecast/',
+        'POST',
+        {
+          product_id: productId,
+          historical_data: salesData,
+          days_ahead: effectiveDays,
+          model_type: mlModelType,
+          bulk_mode: true,
+        },
+        45000
+      );
+
+      const saved = await saveForecastRows(productId, mlResponse.forecasts || [], {
+        unitPrice,
+        modelType: resolvedModelType,
+      });
+      if (saved > 0) {
+        generated += 1;
+        rowsSaved += saved;
+      } else {
+        skipped += 1;
+      }
+    };
+
+    for (let i = 0; i < productIds.length; i += concurrency) {
+      const batch = productIds.slice(i, i + concurrency);
+      const results = await Promise.allSettled(batch.map((pid) => runOne(pid)));
+      results.forEach((result, idx) => {
+        if (result.status === 'rejected') {
+          skipped += 1;
+          errors.push({ product_id: batch[idx], message: result.reason?.message || 'Failed' });
+        }
+      });
+    }
+
+    if (generated > 0) {
+      try {
+        await recalculateAndPersistKPIs(30);
+      } catch (kpiError) {
+        console.warn('Recalculate KPIs after bulk forecast failed:', kpiError);
+      }
+    }
+
+    sendJSON(res, 200, {
+      success: true,
+      generated,
+      skipped,
+      rows_saved: rowsSaved,
+      model_type: resolvedModelType,
+      ml_model_used: mlModelType,
+      days_ahead: effectiveDays,
+      errors: errors.slice(0, 5),
+    });
+  } catch (error) {
+    console.error('Bulk generate forecast error:', error);
+    sendError(res, 500, error.message || 'Bulk forecast failed');
   }
 };
 

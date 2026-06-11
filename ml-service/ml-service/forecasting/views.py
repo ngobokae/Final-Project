@@ -89,8 +89,11 @@ class ForecastView(APIView):
             historical_data = request.data.get('historical_data', [])
             days_ahead = int(request.data.get('days_ahead', 30))
             model_type = str(request.data.get('model_type', 'ensemble')).lower()
+            bulk_mode = bool(request.data.get('bulk_mode', False))
             if model_type not in {'ensemble', 'prophet', 'lstm'}:
                 model_type = 'ensemble'
+            if bulk_mode and model_type == 'ensemble':
+                model_type = 'prophet'
 
             if not product_id:
                 return Response({'error': 'product_id is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -107,7 +110,7 @@ class ForecastView(APIView):
             if len(df) < 1:
                 return Response({'error': 'Insufficient valid data points'}, status=status.HTTP_400_BAD_REQUEST)
 
-            forecasts = self._generate_forecast(df, days_ahead, model_type)
+            forecasts = self._generate_forecast(df, days_ahead, model_type, bulk_mode=bulk_mode)
             insights = self._calculate_insights(df, forecasts)
 
             return Response({
@@ -121,17 +124,19 @@ class ForecastView(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def _generate_forecast(self, df, days_ahead, model_type='ensemble'):
+    def _generate_forecast(self, df, days_ahead, model_type='ensemble', bulk_mode=False):
         model_type = str(model_type or 'ensemble').lower()
         allowed = {'ensemble', 'prophet', 'lstm'}
         if model_type not in allowed:
             model_type = 'ensemble'
+        if bulk_mode and model_type == 'ensemble':
+            model_type = 'prophet'
         if model_type == 'prophet':
             return self._forecast_prophet(df, days_ahead)
         if model_type == 'lstm':
-            return self._forecast_lstm(df, days_ahead)
+            return self._forecast_lstm(df, days_ahead, bulk_mode=bulk_mode)
 
-        return self._forecast_ensemble(df, days_ahead)
+        return self._forecast_ensemble(df, days_ahead, bulk_mode=bulk_mode)
 
     def _prepare_series(self, df):
         series_df = df[['sale_date', 'quantity']].copy()
@@ -237,7 +242,7 @@ class ForecastView(APIView):
         except Exception:
             return self._forecast_baseline(df, days_ahead, source='random_forest')
 
-    def _forecast_lstm(self, df, days_ahead):
+    def _forecast_lstm(self, df, days_ahead, bulk_mode=False):
         df_series = self._prepare_series(df)
         values = df_series['quantity'].astype(float).values
         lookback = min(14, max(3, len(values) // 2))
@@ -263,7 +268,7 @@ class ForecastView(APIView):
                 tf.keras.layers.Dense(1)
             ])
             model.compile(optimizer='adam', loss='mse')
-            epochs = min(50, max(10, len(X) // 2))
+            epochs = min(12 if bulk_mode else 50, max(5 if bulk_mode else 10, len(X) // 2))
             model.fit(X, y, epochs=epochs, batch_size=8, verbose=0)
 
             predictions = []
@@ -278,7 +283,9 @@ class ForecastView(APIView):
         except Exception:
             return self._forecast_baseline(df, days_ahead, source='lstm')
 
-    def _forecast_ensemble(self, df, days_ahead):
+    def _forecast_ensemble(self, df, days_ahead, bulk_mode=False):
+        if bulk_mode:
+            return self._forecast_prophet(df, days_ahead)
         methods = ['prophet', 'lstm']
         candidate_forecasts = {}
 

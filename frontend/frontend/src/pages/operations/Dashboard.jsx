@@ -252,7 +252,7 @@ export default function OperationsDashboard() {
             {metrics.salesThisMonth !== null ? formatCurrency(metrics.salesThisMonth) : 'No sales data'}
           </div>
             <p className="text-xs text-gray-500 mt-1">
-              Sold/stock-out minus procurement
+              Sold/stock-out minus procurement (Excel upload does not count)
               {metrics.procurementDeductions > 0 ? ` (−${formatCurrency(metrics.procurementDeductions)})` : ''}
             </p>
           </CardContent>

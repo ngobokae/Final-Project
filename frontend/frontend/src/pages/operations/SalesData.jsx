@@ -35,7 +35,7 @@ export default function SalesData() {
   const [predicting, setPredicting] = useState(false);
   const [predictProgress, setPredictProgress] = useState({ current: 0, total: 0 });
   const [demandModels, setDemandModels] = useState([]);
-  const [selectedModelId, setSelectedModelId] = useState('ensemble');
+  const [selectedModelId, setSelectedModelId] = useState('prophet');
   const [uploadedFiles, setUploadedFiles] = useState(() => {
     try {
       const saved = localStorage.getItem('sales_uploaded_files');
@@ -374,13 +374,13 @@ export default function SalesData() {
   };
 
   const handleRunPredictions = async () => {
-    const MAX_BULK_PRODUCTS = 12;
+    const MAX_BULK_PRODUCTS = 8;
     try {
       setPredicting(true);
       setPredictProgress({ current: 0, total: 0 });
 
       const availableModels = demandModels.length ? demandModels : DEFAULT_DEMAND_MODELS;
-      const finalModelId = selectedModelId || availableModels[0]?.id || 'ensemble';
+      const finalModelId = selectedModelId || availableModels[0]?.id || 'prophet';
       const modelName = availableModels.find((m) => m.id === finalModelId)?.name || finalModelId;
 
       let uniqueProductIds = [];
@@ -402,71 +402,41 @@ export default function SalesData() {
 
       if (uniqueProductIds.length > MAX_BULK_PRODUCTS && filterProduct === 'all') {
         const ok = await confirm(
-          `Predict for the first ${MAX_BULK_PRODUCTS} of ${uniqueProductIds.length} products? (Faster than all at once.) Use the product filter to run one product only.`,
+          `Predict for the first ${MAX_BULK_PRODUCTS} of ${uniqueProductIds.length} products? (Faster batch.) Use the product filter to run one product only.`,
           { title: 'Limit prediction batch', confirmText: `Run ${MAX_BULK_PRODUCTS}`, cancelText: 'Cancel' }
         );
         if (!ok) return;
         uniqueProductIds = uniqueProductIds.slice(0, MAX_BULK_PRODUCTS);
       }
 
-      const baseDaysAhead =
-        dateRange === '30d' ? 30 : dateRange === '90d' ? 90 : dateRange === '7d' ? 7 : 90;
-      const now = new Date();
-      const endOfYear = new Date(now.getFullYear(), 11, 31);
-      const daysUntilYearEnd = Math.max(1, Math.ceil((endOfYear - now) / (24 * 60 * 60 * 1000)));
-      const daysAhead = Math.min(baseDaysAhead, daysUntilYearEnd, 90);
+      const daysAhead = 30;
+      setPredictProgress({ current: 0, total: uniqueProductIds.length });
 
-      const total = uniqueProductIds.length;
-      setPredictProgress({ current: 0, total });
+      const bulkResult = await apiPost('/api/forecast/generate-bulk', {
+        product_ids: uniqueProductIds,
+        days_ahead: daysAhead,
+        model_type: finalModelId,
+      });
 
-      let generated = 0;
-      let skipped = 0;
-      let lastError = null;
+      const generated = Number(bulkResult?.generated || 0);
+      const skipped = Number(bulkResult?.skipped || 0);
+      const lastError = bulkResult?.errors?.[0]?.message || null;
 
-      for (let i = 0; i < uniqueProductIds.length; i++) {
-        const productId = uniqueProductIds[i];
-        setPredictProgress({ current: i + 1, total });
-        try {
-          await apiPost('/api/forecast/generate', {
-            product_id: productId,
-            days_ahead: daysAhead,
-            model_type: finalModelId,
-            bulk_mode: true,
-          });
-          generated++;
-        } catch (err) {
-          const msg = err?.message || '';
-          const isInsufficient =
-            msg.includes('Insufficient historical data') ||
-            msg.includes('data points') ||
-            msg.includes('No historical sales') ||
-            msg.includes('No historical sales data');
-          if (isInsufficient) {
-            skipped++;
-          } else {
-            lastError = err;
-            console.warn('Forecast failed for product', productId, err);
-            skipped++;
-          }
-        }
-      }
+      setPredictProgress({ current: uniqueProductIds.length, total: uniqueProductIds.length });
 
       if (generated > 0) {
-        try {
-          await apiPost('/api/kpis/recalculate', { days: 90 }).catch(() => {});
-        } catch (_) {}
         window.dispatchEvent(new CustomEvent('app:forecasts-updated'));
         await fetchSalesData(dateRange, true);
         setActiveTab('overview');
         const description = skipped > 0
-          ? `Forecasts for ${generated} product(s) (${modelName}). ${skipped} skipped. See Overview → Sales Trends and Forecasted (30D).`
-          : `Forecasts for ${generated} product(s) using ${modelName}. Open the Overview tab to see charts.`;
+          ? `Saved forecasts for ${generated} product(s) (${modelName}). ${skipped} skipped. Check Prediction Revenue card.`
+          : `Forecasts saved for ${generated} product(s) using ${modelName}. Prediction Revenue updated.`;
         window.dispatchEvent(new CustomEvent('app:toast', {
           detail: { type: 'success', title: 'Predictions complete', description },
         }));
       } else {
-        const description = lastError?.message
-          ? `No forecasts saved. ${lastError.message}`
+        const description = lastError
+          ? `No forecasts saved. ${lastError}`
           : 'Each product needs at least one sales row in the database. Upload sales data and try again.';
         window.dispatchEvent(new CustomEvent('app:toast', {
           detail: { type: 'warning', title: 'No forecasts generated', description },
@@ -514,6 +484,7 @@ export default function SalesData() {
   const netRevenue = Number(stats?.netRevenue ?? stats?.totalRevenue ?? 0);
   const predictionRevenue = Number(stats?.predictionRevenue ?? 0);
   const procurementDeductions = Number(stats?.procurementDeductions ?? 0);
+  const historicalSalesValue = Number(stats?.salesRevenue ?? 0);
   const totalUnits = Number(stats?.totalQuantity || 0);
   const totalRecords = Number(stats?.totalRecords || 0);
   const dataQuality = totalRecords > 0 ? 98.7 : 0;
@@ -654,11 +625,14 @@ export default function SalesData() {
               {netRevenue > 0 ? (
                 <span className="text-green-600 flex items-center gap-1">
                   <TrendingUp className="h-3 w-3" />
-                  Sold/stock-out minus procurement
-                  {procurementDeductions > 0 ? ` (−${formatCurrency(procurementDeductions)})` : ''}
+                  From inventory sold/stock-out only
+                  {procurementDeductions > 0 ? ` (−${formatCurrency(procurementDeductions)} procurement)` : ''}
                 </span>
               ) : (
-                'No actual revenue in selected period'
+                <span>
+                  Upload Excel is for forecast training only — it does not add to revenue.
+                  {historicalSalesValue > 0 ? ` File sales value: ${formatCurrency(historicalSalesValue)}.` : ''}
+                </span>
               )}
             </p>
           </CardContent>
@@ -699,7 +673,9 @@ export default function SalesData() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(predictionRevenue)}</div>
-            <p className="text-xs text-indigo-600 mt-1 font-medium italic">Forecast demand × unit price (30d) — not actual sales</p>
+            <p className="text-xs text-indigo-600 mt-1 font-medium italic">
+              From forecast_results table (30d) — run Predict 2 after upload
+            </p>
           </CardContent>
         </Card>
       </div>

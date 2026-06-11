@@ -58,18 +58,20 @@ export const calculateTransactionRevenue = async (days = 30) => {
 
     const salesRevenue = Number(salesRow?.revenue || 0);
     const txnRevenue = Math.round(total * 100) / 100;
-    const combined = Math.max(txnRevenue, salesRevenue);
+    // Actual revenue = inventory sold/stock-out only. Sales uploads are for forecast training, not revenue.
+    const actualRevenue = txnRevenue;
 
     return {
       transaction_revenue: txnRevenue,
       sales_revenue: salesRevenue,
-      actual_revenue: Math.round(combined * 100) / 100,
-      sold_units: Math.max(units, Number(salesRow?.units || 0)),
-      transaction_count: count + Number(salesRow?.cnt || 0),
+      actual_revenue: actualRevenue,
+      sold_units: units,
+      transaction_count: count,
+      sales_record_count: Number(salesRow?.cnt || 0),
     };
   } catch (error) {
     console.error('calculateTransactionRevenue error:', error);
-    return { transaction_revenue: 0, sales_revenue: 0, actual_revenue: 0, sold_units: 0, transaction_count: 0 };
+    return { transaction_revenue: 0, sales_revenue: 0, actual_revenue: 0, sold_units: 0, transaction_count: 0, sales_record_count: 0 };
   }
 };
 
@@ -102,8 +104,20 @@ export const calculatePredictionRevenue = async (days = 30) => {
   try {
     const [row] = await query(
       `
-        SELECT COALESCE(SUM(f.forecasted_demand * p.unit_price), 0) as prediction_revenue,
-               COALESCE(SUM(f.forecasted_demand), 0) as forecast_units
+        SELECT COALESCE(SUM(
+          f.forecasted_demand * COALESCE(
+            NULLIF(p.unit_price, 0),
+            NULLIF(f.unit_price, 0),
+            (
+              SELECT AVG(s.unit_price)
+              FROM sales s
+              WHERE s.product_id = f.product_id AND s.unit_price > 0
+            ),
+            0
+          )
+        ), 0) as prediction_revenue,
+               COALESCE(SUM(f.forecasted_demand), 0) as forecast_units,
+               COUNT(*) as forecast_rows
         FROM forecast_results f
         JOIN products p ON f.product_id = p.id
         WHERE f.forecast_date >= CURDATE()
@@ -114,10 +128,11 @@ export const calculatePredictionRevenue = async (days = 30) => {
     return {
       prediction_revenue: Math.round(Number(row?.prediction_revenue || 0) * 100) / 100,
       forecast_units: Number(row?.forecast_units || 0),
+      forecast_rows: Number(row?.forecast_rows || 0),
     };
   } catch (error) {
     console.error('calculatePredictionRevenue error:', error);
-    return { prediction_revenue: 0, forecast_units: 0 };
+    return { prediction_revenue: 0, forecast_units: 0, forecast_rows: 0 };
   }
 };
 

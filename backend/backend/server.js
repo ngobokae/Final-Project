@@ -89,6 +89,7 @@ const routes = {
   // Forecast routes
   'GET /api/forecast': { handler: forecastRoutes.handleGetForecasts, auth: true, permission: { resource: 'forecasts', action: 'view' } },
   'POST /api/forecast/generate': { handler: forecastRoutes.handleGenerateForecast, auth: true, roles: ['admin', 'operations', 'executive', 'operations_manager'], permission: { resource: 'forecasts', action: 'create' } },
+  'POST /api/forecast/generate-bulk': { handler: forecastRoutes.handleBulkGenerateForecast, auth: true, roles: ['admin', 'operations', 'executive', 'operations_manager'], permission: { resource: 'forecasts', action: 'create' } },
   'DELETE /api/forecast': { handler: forecastRoutes.handleDeleteForecasts, auth: true, roles: ['admin', 'operations', 'executive', 'operations_manager'], permission: { resource: 'forecasts', action: 'delete' } },
   'GET /api/forecast/recommendations': { handler: forecastRoutes.handleGetInventoryRecommendations, auth: true, permission: { resource: 'forecasts', action: 'view' } },
   'POST /api/forecast/recommendations': { handler: forecastRoutes.handleGenerateRecommendations, auth: true, roles: ['admin', 'inventory', 'executive', 'operations_manager'], permission: { resource: 'forecasts', action: 'create' } },
