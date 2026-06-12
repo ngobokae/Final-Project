@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Target, TrendingUp, TrendingDown, DollarSign, Package, Users, Percent, BarChart3, RefreshCw, Filter } from 'lucide-react';
+import { Target, TrendingUp, TrendingDown, DollarSign, Package, Percent, BarChart3, RefreshCw, Filter, Sparkles } from 'lucide-react';
+import { apiGet } from '../../utils/api';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Button } from '../../components/ui/button';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -37,110 +38,141 @@ export default function KPIs() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
       const days = getDaysFromRange(timeRange);
-      const [kpisRes, summaryRes, forecastMetricsRes] = await Promise.all([
-        fetch('http://localhost:3001/api/kpis', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch('http://localhost:3001/api/kpis/summary', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`http://localhost:3001/api/dashboard/demand-forecast-metrics?days=${days}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
+      const [kpisRes, summaryRes, dashStatsRes] = await Promise.all([
+        apiGet(`/api/kpis?days=${days}`).catch(() => ({ kpis: [] })),
+        apiGet('/api/kpis/summary').catch(() => ({ on_track: 0, near_target: 0, needs_attention: 0 })),
+        apiGet(`/api/dashboard/stats?days=${days}`).catch(() => ({ stats: {} })),
       ]);
-      
-      let kpisData = [];
-      if (kpisRes.ok) {
-        const data = await kpisRes.json();
-        kpisData = data.data?.kpis || data.kpis || data || [];
-      }
-      
-      // If no KPIs exist, generate them from real forecast metrics only
-      if (kpisData.length === 0 && forecastMetricsRes.ok) {
-        const rawMetrics = await forecastMetricsRes.json();
-        const metrics = rawMetrics.data || rawMetrics || {};
-        const fx = metrics.executiveKpis || {};
 
-        const revenue = Number(fx.revenue) || 0;
-        const grossMarginPct = Number(fx.grossMarginPct) || 0;
-        const inventoryTurnover = Number(fx.inventoryTurnover) || 0;
-        const orderFulfilmentPct = Number(fx.orderFulfilmentPct) || 0;
-        const productionEfficiency = Number(fx.productionEfficiency) || 0;
-        const customerSatisfactionRating = Number(fx.customerSatisfactionRating) || 0;
+      const dashStats = dashStatsRes?.stats || {};
+      const netRevenue = Number(dashStats.net_revenue ?? dashStats.total_revenue ?? 0);
+      const predictionRevenue = Number(dashStats.prediction_revenue ?? dashStats.total_revenue_forecast ?? 0);
 
+      let kpisData = kpisRes?.data?.kpis || kpisRes?.kpis || [];
+
+      if (Array.isArray(kpisData) && kpisData.length > 0) {
+        kpisData = kpisData
+          .filter((k) => k.name !== 'Customer Satisfaction' && k.name !== 'Revenue')
+          .map((k) => {
+            if (k.name === 'Total Revenue') {
+              return {
+                ...k,
+                current_value: netRevenue,
+                target_value: Math.max(netRevenue * 1.1, 1),
+              };
+            }
+            return k;
+          });
+
+        if (!kpisData.some((k) => k.name === 'Total Revenue')) {
+          kpisData.unshift({
+            id: 1,
+            name: 'Total Revenue',
+            category: 'financial',
+            current_value: netRevenue,
+            target_value: Math.max(netRevenue * 1.1, 1),
+            unit: 'FRW',
+            trend: netRevenue > 0 ? 'up' : 'stable',
+            change_percentage: 0,
+          });
+        }
+
+        if (!kpisData.some((k) => k.name === 'Prediction Revenue')) {
+          kpisData.push({
+            id: 5,
+            name: 'Prediction Revenue',
+            category: 'financial',
+            current_value: predictionRevenue,
+            target_value: Math.max(predictionRevenue * 1.1, 1),
+            unit: 'FRW',
+            trend: predictionRevenue > 0 ? 'up' : 'stable',
+            change_percentage: 0,
+          });
+        } else {
+          kpisData = kpisData.map((k) =>
+            k.name === 'Prediction Revenue'
+              ? {
+                  ...k,
+                  category: 'financial',
+                  current_value: predictionRevenue,
+                  target_value: Math.max(predictionRevenue * 1.1, 1),
+                  unit: 'FRW',
+                }
+              : k
+          );
+        }
+      } else {
         kpisData = [
           {
             id: 1,
-            name: 'Revenue',
+            name: 'Total Revenue',
             category: 'financial',
-            current_value: revenue,
-            target_value: revenue * 1.1,
+            current_value: netRevenue,
+            target_value: Math.max(netRevenue * 1.1, 1),
             unit: 'FRW',
-            trend: 'up',
-            change_percentage: 0
+            trend: netRevenue > 0 ? 'up' : 'stable',
+            change_percentage: 0,
           },
           {
             id: 2,
             name: 'Gross Margin',
             category: 'financial',
-            current_value: grossMarginPct,
+            current_value: 0,
             target_value: 36.0,
             unit: '%',
-            trend: 'up',
-            change_percentage: 0
+            trend: 'stable',
+            change_percentage: 0,
           },
           {
             id: 3,
             name: 'Inventory Turnover',
             category: 'operations',
-            current_value: inventoryTurnover,
+            current_value: 0,
             target_value: 3.5,
             unit: 'x',
-            trend: 'up',
-            change_percentage: 0
+            trend: 'stable',
+            change_percentage: 0,
           },
           {
             id: 4,
             name: 'Order Fulfillment',
             category: 'operations',
-            current_value: orderFulfilmentPct,
+            current_value: 0,
             target_value: 99.0,
             unit: '%',
-            trend: 'up',
-            change_percentage: 0
+            trend: 'stable',
+            change_percentage: 0,
           },
           {
             id: 5,
-            name: 'Customer Satisfaction',
-            category: 'customer',
-            current_value: customerSatisfactionRating,
-            target_value: 4.8,
-            unit: '/5',
-            trend: 'up',
-            change_percentage: 0
+            name: 'Prediction Revenue',
+            category: 'financial',
+            current_value: predictionRevenue,
+            target_value: Math.max(predictionRevenue * 1.1, 1),
+            unit: 'FRW',
+            trend: predictionRevenue > 0 ? 'up' : 'stable',
+            change_percentage: 0,
           },
           {
             id: 6,
             name: 'Production Efficiency',
             category: 'operations',
-            current_value: productionEfficiency,
+            current_value: 0,
             target_value: 95.0,
             unit: '%',
-            trend: 'up',
-            change_percentage: 0
-          }
+            trend: 'stable',
+            change_percentage: 0,
+          },
         ];
       }
       
       setKpis(kpisData);
       
-      if (summaryRes.ok) {
-        const data = await summaryRes.json();
-        setSummary(data.data || data || { on_track: 0, near_target: 0, needs_attention: 0 });
+      const summary = summaryRes?.data || summaryRes || {};
+      if (summary.on_track !== undefined) {
+        setSummary(summary);
       } else {
-        // Calculate summary from KPIs
         const onTrack = kpisData.filter(k => (k.current_value / k.target_value * 100) >= 95).length;
         const nearTarget = kpisData.filter(k => {
           const percent = (k.current_value / k.target_value * 100);
@@ -158,11 +190,12 @@ export default function KPIs() {
 
   const getIcon = (name) => {
     const icons = {
+      'Total Revenue': DollarSign,
       'Revenue': DollarSign,
+      'Prediction Revenue': Sparkles,
       'Gross Margin': Percent,
       'Inventory Turnover': Package,
       'Order Fulfillment': Target,
-      'Customer Satisfaction': Users,
       'Production Efficiency': BarChart3
     };
     return icons[name] || Target;

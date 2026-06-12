@@ -5,7 +5,10 @@ import Busboy from 'busboy';
 import ExcelJS from 'exceljs';
 import path from 'path';
 import { recalculateAndPersistKPIs } from './kpis.js';
-import { calculateNetRevenueMetrics, calculatePredictionRevenue } from '../utils/revenueMetrics.js';
+import { calculateNetRevenueMetrics } from '../utils/revenueMetrics.js';
+
+/** Revenue KPI window — must match Operations dashboard (30 days). */
+const REVENUE_WINDOW_DAYS = 30;
 
 async function parseExcelBuffer(buffer) {
   const workbook = new ExcelJS.Workbook();
@@ -147,8 +150,7 @@ export const handleGetSalesStats = async (req, res) => {
     }
 
     const [stats] = await query(sql, params);
-    const revenueMetrics = await calculateNetRevenueMetrics(days);
-    const prediction30 = await calculatePredictionRevenue(30);
+    const revenueMetrics = await calculateNetRevenueMetrics(REVENUE_WINDOW_DAYS);
 
     sendJSON(res, 200, {
       totalRecords: stats?.totalRecords || 0,
@@ -158,7 +160,8 @@ export const handleGetSalesStats = async (req, res) => {
       actualRevenue: revenueMetrics.actual_revenue,
       salesRevenue: revenueMetrics.sales_revenue,
       procurementDeductions: revenueMetrics.procurement_deductions,
-      predictionRevenue: prediction30.prediction_revenue,
+      predictionRevenue: revenueMetrics.prediction_revenue,
+      revenueWindowDays: REVENUE_WINDOW_DAYS,
       avgOrderValue: stats?.avgOrderValue || 0,
     });
   } catch (error) {
@@ -618,8 +621,7 @@ export const handleUploadSales = async (req, res) => {
         WHERE sale_date >= DATE_SUB(CURDATE(), INTERVAL 365 DAY)
       `);
       const row = statsRows && statsRows[0] ? statsRows[0] : { total_sales: 0, total_quantity: 0, total_revenue: 0 };
-      const revenueMetrics = await calculateNetRevenueMetrics(365);
-      const prediction30 = await calculatePredictionRevenue(30);
+      const revenueMetrics = await calculateNetRevenueMetrics(REVENUE_WINDOW_DAYS);
       stats = {
         totalRecords: row.total_sales || 0,
         totalQuantity: row.total_quantity || 0,
@@ -628,7 +630,8 @@ export const handleUploadSales = async (req, res) => {
         actualRevenue: revenueMetrics.actual_revenue,
         salesRevenue: revenueMetrics.sales_revenue,
         procurementDeductions: revenueMetrics.procurement_deductions,
-        predictionRevenue: prediction30.prediction_revenue,
+        predictionRevenue: revenueMetrics.prediction_revenue,
+        revenueWindowDays: REVENUE_WINDOW_DAYS,
       };
     }
 

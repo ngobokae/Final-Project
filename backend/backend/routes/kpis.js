@@ -1,5 +1,6 @@
 import { query } from '../config/database.js';
 import { sendSuccess, sendError, parseBody } from '../utils/helpers.js';
+import { calculateNetRevenueMetrics } from '../utils/revenueMetrics.js';
 
 /**
  * Calculate real KPIs from actual database data
@@ -11,29 +12,43 @@ const calculateRealKPIs = async (days = 30) => {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
     const dateStr = startDate.toISOString().split('T')[0];
-
-    // 1. REVENUE - from sales table
-    const [revenueData] = await query(`
-      SELECT 
-        COALESCE(SUM(total_amount), 0) as current_value
-      FROM sales
-      WHERE sale_date >= ?
-    `, [dateStr]);
-
-    // Get previous period revenue for trend calculation
     const prevStartDate = new Date(startDate);
     prevStartDate.setDate(prevStartDate.getDate() - days);
     const prevDateStr = prevStartDate.toISOString().split('T')[0];
-    
-    const [prevRevenueData] = await query(`
-      SELECT 
-        COALESCE(SUM(total_amount), 0) as prev_value
-      FROM sales
-      WHERE sale_date >= ? AND sale_date < ?
-    `, [prevDateStr, dateStr]);
 
-    const revenue = parseFloat(revenueData.current_value) || 0;
-    const prevRevenue = parseFloat(prevRevenueData.prev_value) || 0;
+    // 1. TOTAL REVENUE — inventory sold/stock-out minus procurement (not sales uploads)
+    const revenueMetrics = await calculateNetRevenueMetrics(days);
+    const revenue = revenueMetrics.net_revenue;
+    const predictionRevenue = revenueMetrics.prediction_revenue;
+
+    // Previous period net revenue for trend
+    const [prevTxnRow] = await query(`
+      SELECT COALESCE(SUM(
+        CASE
+          WHEN JSON_EXTRACT(a.details, '$.total_amount') IS NOT NULL
+            THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(a.details, '$.total_amount')) AS DECIMAL(15,2))
+          WHEN JSON_EXTRACT(a.details, '$.unit_price') IS NOT NULL
+            THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(a.details, '$.quantity')) AS DECIMAL(15,2))
+              * CAST(JSON_UNQUOTE(JSON_EXTRACT(a.details, '$.unit_price')) AS DECIMAL(15,2))
+          ELSE 0
+        END
+      ), 0) as total
+      FROM audit_logs a
+      WHERE a.entity_type = 'inventory'
+        AND a.action IN ('INVENTORY_TXN_SOLD', 'INVENTORY_TXN_STOCK_OUT')
+        AND a.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+        AND a.created_at < DATE_SUB(NOW(), INTERVAL ? DAY)
+    `, [days * 2, days]).catch(() => [{ total: 0 }]);
+
+    const [prevProcRow] = await query(`
+      SELECT COALESCE(SUM(total_cost), 0) as total
+      FROM procurement_orders
+      WHERE status IN ('approved', 'in_transit', 'delivered')
+        AND order_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+        AND order_date < DATE_SUB(CURDATE(), INTERVAL ? DAY)
+    `, [days * 2, days]).catch(() => [{ total: 0 }]);
+
+    const prevRevenue = Math.round((Number(prevTxnRow?.total || 0) - Number(prevProcRow?.total || 0)) * 100) / 100;
     const revenueChange = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue * 100) : 0;
 
     // 2. GROSS MARGIN - from sales and products
@@ -89,22 +104,24 @@ const calculateRealKPIs = async (days = 30) => {
     const fulfilledOrders = parseInt(fulfillmentData.fulfilled_orders) || 0;
     const orderFulfillment = totalOrders > 0 ? (fulfilledOrders / totalOrders * 100) : 0;
 
-    // 5. CUSTOMER SATISFACTION - would come from customer_feedback table (mock for now)
-    // In production, calculate from actual customer satisfaction data
-    const customerSatisfaction = 4.6; // Mock value - replace with real data
-
-    // 6. PRODUCTION EFFICIENCY - would come from production data (mock for now)
-    // In production, calculate from actual production data
-    const productionEfficiency = 89.5; // Mock value - replace with real data
+    // Production efficiency from production plans
+    const [productionRow] = await query(`
+      SELECT AVG(CASE WHEN status = 'completed' THEN
+        (actual_quantity / NULLIF(target_quantity, 0)) * 100
+      ELSE NULL END) as avg_efficiency
+      FROM production_plans
+      WHERE start_date >= ?
+    `, [dateStr]).catch(() => [{ avg_efficiency: 0 }]);
+    const productionEfficiency = Number(productionRow?.avg_efficiency) || 0;
 
     // Build KPI array
     const kpis = [
       {
         id: 1,
-        name: 'Revenue',
+        name: 'Total Revenue',
         category: 'financial',
         current_value: revenue,
-        target_value: revenue * 1.1, // 10% growth target
+        target_value: Math.max(revenue * 1.1, 1),
         unit: 'FRW',
         trend: revenueChange > 0 ? 'up' : revenueChange < 0 ? 'down' : 'stable',
         change_percentage: Math.round(revenueChange * 100) / 100,
@@ -149,12 +166,12 @@ const calculateRealKPIs = async (days = 30) => {
       },
       {
         id: 5,
-        name: 'Customer Satisfaction',
-        category: 'customer',
-        current_value: customerSatisfaction,
-        target_value: 4.8,
-        unit: '/5',
-        trend: 'stable',
+        name: 'Prediction Revenue',
+        category: 'financial',
+        current_value: predictionRevenue,
+        target_value: Math.max(predictionRevenue * 1.1, 1),
+        unit: 'FRW',
+        trend: predictionRevenue > 0 ? 'up' : 'stable',
         change_percentage: 0,
         period_start: dateStr,
         period_end: new Date().toISOString().split('T')[0]
@@ -435,12 +452,12 @@ export const handleGetDemandForecastMetrics = async (req, res) => {
 
     // Build executive KPIs object matching frontend expectations
     const executiveKpis = {
-      revenue: kpis.find(k => k.name === 'Revenue')?.current_value || 0,
+      revenue: kpis.find(k => k.name === 'Total Revenue')?.current_value || 0,
+      predictionRevenue: kpis.find(k => k.name === 'Prediction Revenue')?.current_value || 0,
       grossMarginPct: kpis.find(k => k.name === 'Gross Margin')?.current_value || 0,
       inventoryTurnover: kpis.find(k => k.name === 'Inventory Turnover')?.current_value || 0,
       orderFulfilmentPct: kpis.find(k => k.name === 'Order Fulfillment')?.current_value || 0,
       productionEfficiency: kpis.find(k => k.name === 'Production Efficiency')?.current_value || 0,
-      customerSatisfactionRating: kpis.find(k => k.name === 'Customer Satisfaction')?.current_value || 0
     };
 
     sendSuccess(res, {

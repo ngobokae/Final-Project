@@ -909,9 +909,12 @@ export const handleGetDemandForecastMetrics = async (req, res) => {
       FROM forecast_results
     `).catch(() => []);
 
-    // --- Executive-style KPI metrics derived from sales / inventory / forecasts ---
+    // --- Executive-style KPI metrics (real net revenue + prediction revenue) ---
+    const revenueMetrics = await calculateNetRevenueMetrics(days);
+    const netRevenue = revenueMetrics.net_revenue;
+    const predictionRevenue = revenueMetrics.prediction_revenue;
 
-    // Revenue and gross margin for the selected window
+    // Gross margin still derived from sales uploads (training data)
     const [revenueRow] = await query(`
       SELECT 
         COALESCE(SUM(s.total_amount), 0) as total_revenue,
@@ -921,9 +924,9 @@ export const handleGetDemandForecastMetrics = async (req, res) => {
       WHERE s.sale_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
     `, [days]).catch(() => [{ total_revenue: 0, gross_profit: 0 }]);
 
-    const totalRevenue = Number(revenueRow?.total_revenue) || 0;
+    const salesRevenue = Number(revenueRow?.total_revenue) || 0;
     const grossProfit = Number(revenueRow?.gross_profit) || 0;
-    const grossMarginPct = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+    const grossMarginPct = salesRevenue > 0 ? (grossProfit / salesRevenue) * 100 : 0;
 
     // Inventory turnover for the same window
     const inventoryTurnover = await calculateInventoryTurnover(days);
@@ -953,17 +956,13 @@ export const handleGetDemandForecastMetrics = async (req, res) => {
 
     const productionEfficiency = Number(productionRow?.avg_efficiency) || 0;
 
-    // Customer satisfaction proxy (no direct table yet) – derive from health metrics style
-    const customerSatisfactionScore = 85; // same baseline as health metrics "Customer Experience"
-    const customerSatisfactionRating = customerSatisfactionScore / 20; // scale to /5
-
     const executiveKpis = {
-      revenue: totalRevenue,
+      revenue: netRevenue,
+      predictionRevenue,
       grossMarginPct,
       inventoryTurnover,
       orderFulfilmentPct,
       productionEfficiency,
-      customerSatisfactionRating
     };
 
     sendJSON(res, 200, {

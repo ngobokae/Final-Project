@@ -264,7 +264,7 @@ export default function ExecutiveDashboard() {
           color: 'text-blue-600 dark:text-blue-400',
           bgColor: 'bg-blue-50 dark:bg-blue-950',
           sparkline: revenueSpark,
-          subtitle: 'Sold/stock-out minus procurement'
+          subtitle: 'Sold/stock-out minus procurement (Excel upload does not count)'
         },
         {
           id: 'orders',
@@ -330,7 +330,7 @@ export default function ExecutiveDashboard() {
           bgColor: 'bg-indigo-50 dark:bg-indigo-950',
           sparkline: revenueForecast > 0 ? [0, revenueForecast * 0.7, revenueForecast * 0.85, revenueForecast] : [0],
           isCurrency: true,
-          subtitle: 'Forecast demand × unit price'
+          subtitle: 'Forecast demand × unit price (30d)'
         }
       ]);
 

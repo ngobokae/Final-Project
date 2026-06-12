@@ -110,8 +110,21 @@ export default function SalesData() {
       const data = await apiGet(`/api/sales?${params.toString()}`);
       setSales(data.sales || []);
 
-      const statsData = await apiGet(`/api/sales/stats?days=${days}`);
-      setStats(statsData || null);
+      const [statsData, dashData] = await Promise.all([
+        apiGet(`/api/sales/stats?days=${days}`),
+        apiGet('/api/dashboard/stats?days=30').catch(() => ({ stats: {} })),
+      ]);
+      const dashStats = dashData?.stats || {};
+      setStats({
+        ...(statsData || {}),
+        netRevenue: dashStats.net_revenue ?? statsData?.netRevenue ?? statsData?.totalRevenue ?? 0,
+        totalRevenue: dashStats.net_revenue ?? statsData?.netRevenue ?? statsData?.totalRevenue ?? 0,
+        predictionRevenue: dashStats.prediction_revenue ?? statsData?.predictionRevenue ?? 0,
+        procurementDeductions: dashStats.procurement_deductions ?? statsData?.procurementDeductions ?? 0,
+        actualRevenue: dashStats.actual_revenue ?? statsData?.actualRevenue ?? 0,
+        salesRevenue: statsData?.salesRevenue ?? 0,
+        revenueWindowDays: 30,
+      });
 
       // Fetch forecast metrics in parallel
       const forecastData = await apiGet(`/api/forecast?days=30`).catch(() => ({ forecasts: [] }));
@@ -148,7 +161,7 @@ export default function SalesData() {
           }))
       );
 
-      await fetchForecastMetrics(days);
+      await fetchForecastMetrics(30);
     } catch (error) {
       console.error('Failed to fetch sales data:', error);
       const msg = error?.message || '';
@@ -484,7 +497,6 @@ export default function SalesData() {
   const netRevenue = Number(stats?.netRevenue ?? stats?.totalRevenue ?? 0);
   const predictionRevenue = Number(stats?.predictionRevenue ?? 0);
   const procurementDeductions = Number(stats?.procurementDeductions ?? 0);
-  const historicalSalesValue = Number(stats?.salesRevenue ?? 0);
   const totalUnits = Number(stats?.totalQuantity || 0);
   const totalRecords = Number(stats?.totalRecords || 0);
   const dataQuality = totalRecords > 0 ? 98.7 : 0;
@@ -586,7 +598,7 @@ export default function SalesData() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Sales Data Management</h2>
-          <p className="text-gray-500 mt-1">Upload, manage, and analyze historical sales data.</p>
+          <p className="text-gray-500 mt-1">Upload, manage, and analyze historical sales data. Period filter applies to units, records & charts only.</p>
         </div>
         <div className="flex items-center gap-2">
               <Select value={dateRange} onValueChange={setDateRange}>
@@ -622,18 +634,8 @@ export default function SalesData() {
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(netRevenue)}</div>
             <p className="text-xs text-gray-500 mt-1">
-              {netRevenue > 0 ? (
-                <span className="text-green-600 flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3" />
-                  From inventory sold/stock-out only
-                  {procurementDeductions > 0 ? ` (−${formatCurrency(procurementDeductions)} procurement)` : ''}
-                </span>
-              ) : (
-                <span>
-                  Upload Excel is for forecast training only — it does not add to revenue.
-                  {historicalSalesValue > 0 ? ` File sales value: ${formatCurrency(historicalSalesValue)}.` : ''}
-                </span>
-              )}
+              Sold/stock-out minus procurement (Excel upload does not count)
+              {procurementDeductions > 0 ? ` (−${formatCurrency(procurementDeductions)})` : ''}
             </p>
           </CardContent>
         </Card>
@@ -673,9 +675,7 @@ export default function SalesData() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(predictionRevenue)}</div>
-            <p className="text-xs text-indigo-600 mt-1 font-medium italic">
-              From forecast_results table (30d) — run Predict 2 after upload
-            </p>
+            <p className="text-xs text-gray-500 mt-1">Forecast demand × unit price (30d)</p>
           </CardContent>
         </Card>
       </div>
