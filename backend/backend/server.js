@@ -83,7 +83,7 @@ const routes = {
   'GET /api/inventory/transactions': { handler: inventoryRoutes.handleGetInventoryTransactions, auth: true, roles: ['admin', 'inventory', 'operations', 'inventory_manager'], permission: { resource: 'inventory', action: 'view' } },
   'POST /api/inventory/transactions': { handler: inventoryRoutes.handleCreateInventoryTransaction, auth: true, roles: ['admin', 'inventory', 'operations', 'inventory_manager'], permission: { resource: 'inventory', action: 'edit' } },
   'PUT /api/inventory/:id': { handler: inventoryRoutes.handleUpdateInventory, auth: true, roles: ['admin', 'inventory', 'inventory_manager'], permission: { resource: 'inventory', action: 'edit' } },
-  'DELETE /api/inventory': { handler: inventoryRoutes.handleDeleteAllInventoryData, auth: true, roles: ['admin', 'inventory', 'inventory_manager'], permission: { resource: 'inventory', action: 'delete' } },
+  'DELETE /api/inventory': { handler: inventoryRoutes.handleDeleteAllInventoryData, auth: true, roles: ['admin', 'inventory', 'inventory_manager'], permission: { resource: 'inventory', action: 'edit' } },
   'GET /api/inventory/pending-receivables': { handler: inventoryRoutes.handleGetPendingProcurementReceivables, auth: true, roles: ['admin', 'inventory', 'inventory_manager', 'operations', 'operations_manager'], permission: { resource: 'inventory', action: 'view' } },
   'POST /api/inventory/receive-procurement': { handler: inventoryRoutes.handleReceiveProcurementGoods, auth: true, roles: ['admin', 'inventory', 'inventory_manager', 'operations', 'operations_manager'], permission: { resource: 'inventory', action: 'edit' } },
 

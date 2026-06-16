@@ -49,6 +49,7 @@ export default function StockOverview() {
   });
   const warehouses = ['Zone A', 'Zone B', 'Zone C', 'Zone D', 'Main Warehouse'];
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef(null);
 
   const [userRole, setUserRole] = useState('');
@@ -213,7 +214,7 @@ export default function StockOverview() {
     if (!confirmed) return;
 
     try {
-      setLoading(true);
+      setDeleting(true);
       await apiDelete('/api/inventory?scope=all');
       await fetchProducts();
       await fetchInventory();
@@ -227,15 +228,17 @@ export default function StockOverview() {
       }));
     } catch (error) {
       console.error('Failed to delete all inventory data:', error);
+      const message = error?.message || 'Could not delete data. Please try again.';
+      alert(message);
       window.dispatchEvent(new CustomEvent('app:toast', {
         detail: {
           type: 'error',
           title: 'Delete failed',
-          description: error?.message || 'Could not delete data. Please try again.',
+          description: message,
         },
       }));
     } finally {
-      setLoading(false);
+      setDeleting(false);
     }
   };
 
@@ -508,7 +511,7 @@ export default function StockOverview() {
               variant="outline"
               className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
               onClick={handleDeleteAllInventoryData}
-              disabled={loading}
+              disabled={deleting || loading}
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Delete All Data
