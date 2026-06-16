@@ -20,6 +20,7 @@ import { apiGet, apiPost, apiDelete } from '../../utils/api';
 import { DEMAND_MODELS as DEFAULT_DEMAND_MODELS } from '../../utils/models';
 import { darkBlueChartTheme, AreaGradient, axisProps, gridProps, tooltipProps } from '../../utils/chartStyles';
 import { useConfirmDialog } from '../../contexts/ConfirmDialogContext';
+import { downloadCsvReport } from '../../utils/reportExport';
 
 export default function DemandForecast() {
   const { confirm } = useConfirmDialog();
@@ -134,6 +135,22 @@ export default function DemandForecast() {
       setForecasts([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportForecasts = async () => {
+    try {
+      const days = getDaysParam();
+      const data = await apiGet(`/api/reports/demand-forecast?days=${days}`);
+      const report = data?.report;
+      if (!report || !report.details?.length) {
+        alert('No forecast data available to export. Generate predictions first.');
+        return;
+      }
+      downloadCsvReport(report, 'demand-forecast');
+    } catch (error) {
+      console.error('Failed to export forecasts:', error);
+      alert('Export failed. Please try again.');
     }
   };
 
@@ -318,7 +335,7 @@ export default function DemandForecast() {
             <RefreshCcw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportForecasts} disabled={loading || forecasts.length === 0}>
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>

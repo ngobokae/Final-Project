@@ -8,16 +8,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { 
   Search, Filter, AlertTriangle, CheckCircle, Clock, Package,
   Download, Plus, Edit, Eye, TrendingUp, TrendingDown,
-  BarChart3, Warehouse, Box, RefreshCcw, ArrowUpDown, Upload, X, Loader2
+  BarChart3, Warehouse, Box, RefreshCcw, ArrowUpDown, Upload, X, Loader2, Trash2
 } from 'lucide-react';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import { apiGet, apiPut, apiPost } from '../../utils/api';
+import { apiGet, apiPut, apiPost, apiDelete } from '../../utils/api';
 import { formatCurrency } from '../../utils/currency';
+import { useConfirmDialog } from '../../contexts/ConfirmDialogContext';
 
 export default function StockOverview() {
+  const { confirm } = useConfirmDialog();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
@@ -186,6 +188,54 @@ export default function StockOverview() {
     } catch (error) {
       console.error('Failed to download stock report:', error);
       alert('Failed to download stock report. Please try again.');
+    }
+  };
+
+  const handleDeleteAllInventoryData = async () => {
+    const ok = await confirm(
+      'This will permanently delete ALL products, sales, revenue records, stock transactions, procurement orders, production plans, and forecasts. This cannot be undone. Are you sure?',
+      {
+        title: 'Delete All Inventory Data',
+        confirmText: 'Yes, delete everything',
+        variant: 'danger',
+      }
+    );
+    if (!ok) return;
+
+    const confirmed = await confirm(
+      'Final confirmation: every product and transaction will be removed from the database.',
+      {
+        title: 'Confirm Permanent Delete',
+        confirmText: 'Delete all data',
+        variant: 'danger',
+      }
+    );
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      await apiDelete('/api/inventory?scope=all');
+      await fetchProducts();
+      await fetchInventory();
+      window.dispatchEvent(new Event('app:operations-data-updated'));
+      window.dispatchEvent(new CustomEvent('app:toast', {
+        detail: {
+          type: 'success',
+          title: 'Data cleared',
+          description: 'All inventory, sales, and product data has been removed.',
+        },
+      }));
+    } catch (error) {
+      console.error('Failed to delete all inventory data:', error);
+      window.dispatchEvent(new CustomEvent('app:toast', {
+        detail: {
+          type: 'error',
+          title: 'Delete failed',
+          description: error?.message || 'Could not delete data. Please try again.',
+        },
+      }));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -453,6 +503,17 @@ export default function StockOverview() {
             <Download className="w-4 h-4 mr-2" />
             Generate Report
           </Button>
+          {(userRole === 'admin' || userRole === 'inventory' || userRole === 'inventory_manager') && (
+            <Button
+              variant="outline"
+              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+              onClick={handleDeleteAllInventoryData}
+              disabled={loading}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete All Data
+            </Button>
+          )}
         </div>
       </div>
 

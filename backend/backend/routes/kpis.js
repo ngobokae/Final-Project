@@ -107,7 +107,7 @@ const calculateRealKPIs = async (days = 30) => {
     // Production efficiency from production plans
     const [productionRow] = await query(`
       SELECT AVG(CASE WHEN status = 'completed' THEN
-        (actual_quantity / NULLIF(target_quantity, 0)) * 100
+        (completed_quantity / NULLIF(target_quantity, 0)) * 100
       ELSE NULL END) as avg_efficiency
       FROM production_plans
       WHERE start_date >= ?

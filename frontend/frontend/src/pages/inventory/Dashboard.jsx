@@ -202,12 +202,21 @@ export default function InventoryDashboard() {
     const reorder = item.reorder_point || 100;
     return avail > safety && avail < reorder;
   }).length;
-  const revenueLoss = inventory
-    .filter(item => item.available_stock <= item.safety_stock)
-    .reduce((acc, item) => {
-      const shortage = Math.max(0, item.safety_stock - item.available_stock);
-      return acc + (shortage * item.unit_price);
-    }, 0);
+  const revenueLoss = inventoryDashboard?.potentialStockoutLoss != null
+    ? Number(inventoryDashboard.potentialStockoutLoss)
+    : inventory
+      .filter(item => (item.available_stock ?? item.current_stock ?? 0) <= (item.safety_stock || 0))
+      .reduce((acc, item) => {
+        const avail = item.available_stock ?? item.current_stock ?? 0;
+        const shortage = Math.max(0, (item.safety_stock || 0) - avail);
+        return acc + (shortage * (item.unit_price || 0));
+      }, 0);
+
+  const logisticsHealthPercent = inventoryDashboard?.stockHealthPercent != null
+    ? Number(inventoryDashboard.stockHealthPercent)
+    : inventory.length > 0
+      ? Math.round((inventory.filter(item => item.status === 'normal').length / inventory.length) * 100)
+      : 0;
 
   const stats = [
     { label: 'Total Items', value: metrics.totalItems, icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -302,9 +311,22 @@ export default function InventoryDashboard() {
                <span className="text-[10px] uppercase font-bold text-emerald-600 tracking-tight">Logistics Network</span>
                <div className="flex items-center gap-2">
                  <div className="h-1.5 w-24 bg-gray-200 dark:bg-neutral-800 rounded-full overflow-hidden">
-                   <div className="h-full bg-gradient-to-r from-emerald-500 to-blue-500 animate-pulse" style={{ width: '84%' }}></div>
+                   <div
+                     className={`h-full transition-all duration-500 ${
+                       logisticsHealthPercent >= 75
+                         ? 'bg-gradient-to-r from-emerald-500 to-blue-500'
+                         : logisticsHealthPercent >= 50
+                           ? 'bg-gradient-to-r from-amber-400 to-amber-500'
+                           : 'bg-gradient-to-r from-red-500 to-rose-500'
+                     }`}
+                     style={{ width: `${Math.max(8, logisticsHealthPercent)}%` }}
+                   />
                  </div>
-                 <span className="text-[10px] font-bold text-emerald-700">Healthy</span>
+                 <span className={`text-[10px] font-bold ${
+                   logisticsHealthPercent >= 75 ? 'text-emerald-700' : logisticsHealthPercent >= 50 ? 'text-amber-700' : 'text-red-700'
+                 }`}>
+                   {logisticsHealthPercent >= 75 ? 'Healthy' : logisticsHealthPercent >= 50 ? 'Constrained' : 'At Risk'}
+                 </span>
                </div>
              </div>
           </div>

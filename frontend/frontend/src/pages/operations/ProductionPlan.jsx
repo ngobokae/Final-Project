@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Factory, Calendar, Package, Clock, CheckCircle, AlertTriangle, RefreshCw, Trash2 } from 'lucide-react';
+import { Factory, Calendar, Clock, AlertTriangle, RefreshCw, Trash2 } from 'lucide-react';
 import { apiDelete, apiPut, apiGet } from '../../utils/api';
 import { Button } from '../../components/ui/button';
 import { useConfirmDialog } from '../../contexts/ConfirmDialogContext';
@@ -9,44 +9,10 @@ export default function ProductionPlan() {
   const [plans, setPlans] = useState([]);
   const [stats, setStats] = useState({ total: 0, completed: 0, in_progress: 0, delayed: 0 });
   const [loading, setLoading] = useState(true);
-  const [updatingProcurement, setUpdatingProcurement] = useState({});
   const [updatingStatus, setUpdatingStatus] = useState({});
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newPlan, setNewPlan] = useState({
-    product_id: '',
-    target_quantity: 100,
-    start_date: new Date().toISOString().split('T')[0],
-    end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    priority: 'medium'
-  });
-  const [products, setProducts] = useState([]);
-
-  const generateFromForecasts = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      await fetch('http://localhost:3001/api/production/generate-from-forecasts', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-    } catch (error) {
-      console.error('Failed to generate production plans from forecasts:', error);
-    }
-  };
 
   useEffect(() => {
     fetchData();
-  }, []);
-
-  useEffect(() => {
-    const onForecastsUpdated = async () => {
-      await generateFromForecasts();
-      fetchData();
-    };
-    window.addEventListener('app:forecasts-updated', onForecastsUpdated);
-    return () => window.removeEventListener('app:forecasts-updated', onForecastsUpdated);
   }, []);
 
   useEffect(() => {
@@ -54,52 +20,11 @@ export default function ProductionPlan() {
       fetchData();
     };
     window.addEventListener('app:operations-data-updated', onOperationsUpdated);
-    return () => window.removeEventListener('app:operations-data-updated', onOperationsUpdated);
-  }, []);
-
-  const handleAddManualPlan = async (e) => {
-    e.preventDefault();
-    if (!newPlan.product_id) {
-      alert('Please select a product before creating the production plan.');
-      return;
-    }
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/production', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newPlan),
-      });
-
-      if (response.ok) {
-        setShowAddModal(false);
-        await fetchData();
-        window.dispatchEvent(new CustomEvent('app:toast', { 
-          detail: { type: 'success', title: 'Plan Created', description: 'Manual production plan added to schedule.' } 
-        }));
-      }
-    } catch (error) {
-      console.error('Failed to add production plan:', error);
-    }
-  };
-
-  const fetchProducts = async () => {
-    try {
-      const data = await apiGet('/api/products?limit=100');
-      setProducts(data.products || []);
-      if (!newPlan.product_id && Array.isArray(data.products) && data.products.length > 0) {
-        setNewPlan((prev) => ({ ...prev, product_id: data.products[0].id }));
-      }
-    } catch (e) {
-      console.error('Fetch products failed', e);
-    }
-  };
-
-  useEffect(() => {
-    fetchProducts();
+    window.addEventListener('app:forecasts-updated', onOperationsUpdated);
+    return () => {
+      window.removeEventListener('app:operations-data-updated', onOperationsUpdated);
+      window.removeEventListener('app:forecasts-updated', onOperationsUpdated);
+    };
   }, []);
 
   const fetchData = async () => {
@@ -108,13 +33,13 @@ export default function ProductionPlan() {
       const token = localStorage.getItem('token');
       const [plansRes, statsRes] = await Promise.all([
         fetch('http://localhost:3001/api/production', {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` }
         }),
         fetch('http://localhost:3001/api/production/stats', {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` }
         })
       ]);
-      
+
       if (plansRes.ok) {
         const data = await plansRes.json();
         setPlans(data.data?.productionPlans || data.productionPlans || data || []);
@@ -123,7 +48,6 @@ export default function ProductionPlan() {
         const data = await statsRes.json();
         setStats(data.data || data || { total: 0, completed: 0, in_progress: 0, delayed: 0, scheduled: 0 });
       }
-
     } catch (error) {
       console.error('Failed to fetch production data:', error);
     } finally {
@@ -174,18 +98,6 @@ export default function ProductionPlan() {
     return styles[status] || styles.scheduled;
   };
 
-  const getProcurementBadge = (status) => {
-    const styles = {
-      delivered: 'bg-green-100 text-green-800 border-green-200',
-      in_transit: 'bg-blue-100 text-blue-800 border-blue-200',
-      pending: 'bg-gray-100 text-gray-800 border-gray-200',
-      approved: 'bg-purple-100 text-purple-800 border-purple-200',
-      delayed: 'bg-red-100 text-red-800 border-red-200',
-      cancelled: 'bg-gray-100 text-gray-500 border-gray-200',
-    };
-    return styles[status] || styles.pending;
-  };
-
   const getPriorityBadge = (priority) => {
     const styles = {
       high: 'bg-red-500',
@@ -205,130 +117,29 @@ export default function ProductionPlan() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <Factory className="w-7 h-7 text-emerald-600" />
             Kinglion Production Hub
           </h1>
-          <p className="text-gray-500 mt-1">AI-driven manufacturing schedules for Kinglion Rwanda Investment Ltd</p>
+          <p className="text-gray-500 mt-1">
+            Production schedules created from Inventory — view and update status here.
+          </p>
         </div>
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <Package className="w-5 h-5" />
-            + Manual Plan
-          </button>
-          <button
-            type="button"
-            onClick={async () => {
-              await generateFromForecasts();
-              fetchData();
-              window.dispatchEvent(new CustomEvent('app:toast', { 
-                detail: { type: 'success', title: 'AI Plan Generated', description: 'Production schedules have been optimized based on latest demand forecasts.' } 
-              }));
-            }}
-            className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 shadow-md transition-all active:scale-95"
-          >
-            <CheckCircle className="w-5 h-5" />
-            Optimize Production with AI
-          </button>
+          <Button variant="outline" onClick={fetchData}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
         </div>
       </div>
 
-      {/* Manual Add Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-neutral-900 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="p-6 border-b border-gray-100 dark:border-neutral-800">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Create Production Plan</h3>
-              <p className="text-sm text-gray-500 mt-1">Manually schedule a new manufacturing run</p>
-            </div>
-            <form onSubmit={handleAddManualPlan} className="p-6 space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Product</label>
-                <select 
-                  required
-                  className="w-full rounded-lg border border-gray-300 p-2 text-sm bg-white dark:bg-neutral-800 dark:border-neutral-700"
-                  value={newPlan.product_id}
-                  onChange={(e) => setNewPlan({...newPlan, product_id: e.target.value})}
-                >
-                  <option value="">Select a product...</option>
-                  {products.map(p => (
-                    <option key={p.id} value={p.id}>{p.sku} - {p.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Target Qty</label>
-                  <input 
-                    type="number" required
-                    className="w-full rounded-lg border border-gray-300 p-2 text-sm dark:bg-neutral-800 dark:border-neutral-700"
-                    value={newPlan.target_quantity}
-                    onChange={(e) => setNewPlan({...newPlan, target_quantity: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
-                  <select 
-                    className="w-full rounded-lg border border-gray-300 p-2 text-sm dark:bg-neutral-800 dark:border-neutral-700"
-                    value={newPlan.priority}
-                    onChange={(e) => setNewPlan({...newPlan, priority: e.target.value})}
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Start Date</label>
-                  <input 
-                    type="date" required
-                    className="w-full rounded-lg border border-gray-300 p-2 text-sm dark:bg-neutral-800 dark:border-neutral-700"
-                    value={newPlan.start_date}
-                    onChange={(e) => setNewPlan({...newPlan, start_date: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">End Date</label>
-                  <input 
-                    type="date" required
-                    className="w-full rounded-lg border border-gray-300 p-2 text-sm dark:bg-neutral-800 dark:border-neutral-700"
-                    value={newPlan.end_date}
-                    onChange={(e) => setNewPlan({...newPlan, end_date: e.target.value})}
-                  />
-                </div>
-              </div>
-              <div className="pt-4 flex gap-3">
-                <Button type="button" variant="ghost" className="flex-1" onClick={() => setShowAddModal(false)}>
-                  Cancel
-                </Button>
-                <button
-                  type="button"
-                  onClick={handleAddManualPlan}
-                  className="flex-1 inline-flex items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-all"
-                >
-                  Create Plan
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-              <Package className="w-5 h-5 text-gray-600" />
+              <Factory className="w-5 h-5 text-gray-600" />
             </div>
             <div>
               <div className="text-sm text-gray-500">Total Plans</div>
@@ -339,7 +150,7 @@ export default function ProductionPlan() {
         <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <CheckCircle className="w-5 h-5 text-green-600" />
+              <Calendar className="w-5 h-5 text-green-600" />
             </div>
             <div>
               <div className="text-sm text-gray-500">Completed</div>
@@ -371,7 +182,6 @@ export default function ProductionPlan() {
         </div>
       </div>
 
-      {/* Production Plans Table */}
       <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Production Schedule</h2>
@@ -450,46 +260,59 @@ export default function ProductionPlan() {
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
-                            className={`h-2 rounded-full transition-all ${
-                              progress === 100 ? 'bg-green-500' : progress > 50 ? 'bg-blue-500' : 'bg-amber-500'
-                            }`}
-                            style={{ width: `${Math.min(progress, 100)}%` }}
-                          ></div>
+                            className="bg-emerald-600 h-2 rounded-full transition-all"
+                            style={{ width: `${progress}%` }}
+                          />
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
+                      <span className={`inline-block w-3 h-3 rounded-full ${getPriorityBadge(plan.priority)}`} />
+                      <span className="ml-2 text-sm text-gray-600 capitalize">{plan.priority}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${getStatusBadge(plan.status)}`}>
+                        {plan.status?.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${getPriorityBadge(plan.priority)}`}></div>
-                        <span className="text-sm text-gray-600 capitalize">{plan.priority}</span>
+                        {plan.status === 'scheduled' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={updatingStatus[plan.id]}
+                            onClick={() => handleUpdatePlanStatus(plan, 'in_progress')}
+                          >
+                            Start
+                          </Button>
+                        )}
+                        {plan.status === 'in_progress' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={updatingStatus[plan.id]}
+                            onClick={() => handleUpdatePlanStatus(plan, 'completed')}
+                          >
+                            Complete
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleDeletePlan(plan.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <select
-                        value={plan.status || 'scheduled'}
-                        onChange={(e) => handleUpdatePlanStatus(plan, e.target.value)}
-                        disabled={Boolean(updatingStatus[plan.id])}
-                        className={`h-8 rounded-md border px-2 text-xs font-medium ${getStatusBadge(plan.status || 'scheduled')}`}
-                        title="Update production status"
-                      >
-                        <option value="scheduled">Scheduled</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                        <option value="delayed">Delayed</option>
-                        <option value="cancelled">Cancelled</option>
-                      </select>
-                    </td>
-                    <td className="px-6 py-4">
-                      <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={() => handleDeletePlan(plan.id)} title="Delete plan">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
                     </td>
                   </tr>
                 );
               }) : (
                 <tr>
-                  <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
-                    No production plans found
+                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                    No production plans yet. Plans are created automatically from Inventory when you add products or trigger replenishment.
                   </td>
                 </tr>
               )}
@@ -497,7 +320,6 @@ export default function ProductionPlan() {
           </table>
         </div>
       </div>
-
     </div>
   );
 }

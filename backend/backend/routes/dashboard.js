@@ -250,10 +250,30 @@ export const handleGetDashboardStats = async (req, res) => {
       roleSpecificStats.pending_orders = procurementPending?.count ?? 0;
       const [productionBacklog] = await query(`
         SELECT COUNT(*) as count FROM production_plans
-        WHERE status IN ('in_progress', 'scheduled')
-          AND start_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        WHERE status IN ('in_progress', 'scheduled', 'delayed')
       `);
       roleSpecificStats.production_backlog = productionBacklog?.count ?? 0;
+
+      const [lowStockForResilience] = await query(`
+        SELECT COUNT(*) as count
+        FROM inventory i
+        JOIN products p ON i.product_id = p.id
+        WHERE p.is_active = TRUE AND i.available_stock <= p.safety_stock
+      `);
+      const pending = Number(roleSpecificStats.pending_orders) || 0;
+      const lowStock = Number(lowStockForResilience?.count) || 0;
+      const backlog = Number(roleSpecificStats.production_backlog) || 0;
+      const rawResilience = 99.5 - (pending * 1.5 + lowStock * 4.5 + backlog * 2.0);
+      roleSpecificStats.low_stock_alerts = lowStock;
+      roleSpecificStats.resilience_index = Math.max(35, Math.min(99, Math.round(rawResilience)));
+
+      const [stockoutLossRow] = await query(`
+        SELECT SUM(GREATEST(0, p.safety_stock - i.available_stock) * p.unit_price) as loss
+        FROM inventory i
+        JOIN products p ON i.product_id = p.id
+        WHERE p.is_active = TRUE AND i.available_stock <= p.safety_stock
+      `).catch(() => [{ loss: 0 }]);
+      roleSpecificStats.stockout_risk_revenue = Number(stockoutLossRow?.loss) || 0;
     }
 
     if (userRole === 'inventory' || userRole === 'executive') {
@@ -396,6 +416,30 @@ export const handleGetInventoryDashboard = async (req, res) => {
 
     const stockFlow = await calculateStockFlow(30);
 
+    const [stockoutLossRow] = await query(`
+      SELECT SUM(GREATEST(0, p.safety_stock - i.available_stock) * p.unit_price) as loss
+      FROM inventory i
+      JOIN products p ON i.product_id = p.id
+      WHERE p.is_active = TRUE AND i.available_stock <= p.safety_stock
+    `).catch(() => [{ loss: 0 }]);
+
+    const [healthRow] = await query(`
+      SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN i.available_stock > p.safety_stock AND i.available_stock < p.reorder_point THEN 1 ELSE 0 END) as low_count,
+        SUM(CASE WHEN i.available_stock <= p.safety_stock THEN 1 ELSE 0 END) as critical_count,
+        SUM(CASE WHEN i.available_stock >= p.reorder_point AND i.available_stock < (p.reorder_point * 2) THEN 1 ELSE 0 END) as optimal_count
+      FROM inventory i
+      JOIN products p ON i.product_id = p.id
+      WHERE p.is_active = TRUE
+    `).catch(() => [{ total: 0, low_count: 0, critical_count: 0, optimal_count: 0 }]);
+
+    const totalForHealth = Number(healthRow?.total) || 0;
+    const optimalCount = Number(healthRow?.optimal_count) || 0;
+    const stockHealthPercent = totalForHealth > 0
+      ? Math.round((optimalCount / totalForHealth) * 100)
+      : 0;
+
     sendJSON(res, 200, {
       totalProducts: productCount.count,
       stockValue: Number(stockValue?.value) || 0,
@@ -410,6 +454,14 @@ export const handleGetInventoryDashboard = async (req, res) => {
       productsWithForecast: forecastSummary?.products_with_forecast ?? 0,
       totalForecastedDemand: Number(forecastSummary?.total_forecasted_demand) || 0,
       stockFlow,
+      potentialStockoutLoss: Number(stockoutLossRow?.loss) || 0,
+      stockHealthPercent,
+      stockHealthBreakdown: {
+        optimal: optimalCount,
+        low: Number(healthRow?.low_count) || 0,
+        critical: Number(healthRow?.critical_count) || 0,
+        total: totalForHealth
+      },
       chartData: inventoryChart,
       alerts,
       lowStockItems,
@@ -948,7 +1000,7 @@ export const handleGetDemandForecastMetrics = async (req, res) => {
     const [productionRow] = await query(`
       SELECT 
         AVG(CASE WHEN status = 'completed' THEN 
-          (actual_quantity / NULLIF(target_quantity, 0)) * 100 
+          (completed_quantity / NULLIF(target_quantity, 0)) * 100 
         ELSE NULL END) as avg_efficiency
       FROM production_plans
       WHERE start_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
@@ -1157,7 +1209,7 @@ export const handleGetProductionMetrics = async (req, res) => {
         SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
         SUM(CASE WHEN status = 'delayed' THEN 1 ELSE 0 END) as delayed_count,
         AVG(CASE WHEN status = 'completed' THEN 
-          (actual_quantity / target_quantity) * 100 
+          (completed_quantity / target_quantity) * 100 
         ELSE NULL END) as avg_efficiency
       FROM production_plans
       WHERE start_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
@@ -1174,7 +1226,7 @@ export const handleGetProductionMetrics = async (req, res) => {
     const [capacityData] = await query(`
       SELECT 
         AVG(CASE WHEN status = 'in_progress' THEN 
-          (actual_quantity / target_quantity) * 100 
+          (completed_quantity / target_quantity) * 100 
         ELSE 0 END) as utilization
       FROM production_plans
       WHERE start_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
@@ -1184,10 +1236,10 @@ export const handleGetProductionMetrics = async (req, res) => {
     const [deliveryStats] = await query(`
       SELECT 
         COUNT(*) as total_completed,
-        SUM(CASE WHEN completion_date <= end_date THEN 1 ELSE 0 END) as on_time
+        SUM(CASE WHEN DATE(updated_at) <= end_date THEN 1 ELSE 0 END) as on_time
       FROM production_plans
       WHERE status = 'completed'
-        AND completion_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        AND updated_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
     `).catch(() => [{ total_completed: 0, on_time: 0 }]);
     const onTimeRate = deliveryStats?.total_completed > 0
       ? (deliveryStats.on_time / deliveryStats.total_completed) * 100
@@ -1219,17 +1271,17 @@ export const handleGetProductionPlans = async (req, res) => {
         f.forecasted_demand,
         i.current_stock as current_inventory,
         CASE 
-          WHEN pp.actual_quantity >= pp.target_quantity * 0.95 THEN 'on-track'
-          WHEN pp.actual_quantity >= pp.target_quantity * 0.8 THEN 'behind'
-          WHEN pp.actual_quantity >= pp.target_quantity * 1.05 THEN 'ahead'
+          WHEN pp.completed_quantity >= pp.target_quantity * 0.95 THEN 'on-track'
+          WHEN pp.completed_quantity >= pp.target_quantity * 0.8 THEN 'behind'
+          WHEN pp.completed_quantity >= pp.target_quantity * 1.05 THEN 'ahead'
           ELSE 'planned'
-        END as status,
+        END as progress_status,
         CASE 
           WHEN i.available_stock <= p.safety_stock THEN 'high'
           WHEN i.available_stock <= p.reorder_point THEN 'medium'
           ELSE 'low'
-        END as priority,
-        ROUND((pp.actual_quantity / pp.target_quantity) * 100, 0) as completion_rate
+        END as forecast_priority,
+        ROUND((pp.completed_quantity / pp.target_quantity) * 100, 0) as completion_rate
       FROM production_plans pp
       JOIN products p ON pp.product_id = p.id
       JOIN inventory i ON pp.product_id = i.product_id

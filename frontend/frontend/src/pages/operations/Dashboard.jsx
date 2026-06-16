@@ -23,7 +23,9 @@ export default function OperationsDashboard() {
     forecastAccuracy: null,
     pendingOrders: null,
     lowStockAlerts: null,
-    productionBacklog: null
+    productionBacklog: null,
+    resilienceIndex: null,
+    stockoutRiskRevenue: 0
   });
   const [recentForecasts, setRecentForecasts] = useState([]);
   const [alertsList, setAlertsList] = useState([]);
@@ -111,7 +113,9 @@ export default function OperationsDashboard() {
         forecastAccuracy: accuracy > 0 ? accuracy : null,
         pendingOrders,
         lowStockAlerts: lowStockCount,
-        productionBacklog
+        productionBacklog,
+        resilienceIndex: typeof dashStats.resilience_index === 'number' ? dashStats.resilience_index : null,
+        stockoutRiskRevenue: Number(dashStats.stockout_risk_revenue ?? 0)
       });
 
       // Filter and limit recent plans list to active statuses: in_progress, delayed, scheduled
@@ -170,8 +174,11 @@ export default function OperationsDashboard() {
     }
   };
 
-  // Calculate dynamic resilience index
+  // Resilience index from backend (pending orders, low stock, production backlog)
   const resilienceIndex = useMemo(() => {
+    if (typeof metrics.resilienceIndex === 'number') {
+      return metrics.resilienceIndex;
+    }
     if (
       metrics.pendingOrders === null &&
       metrics.lowStockAlerts === null &&
@@ -328,7 +335,7 @@ export default function OperationsDashboard() {
               ? 'from-amber-500 to-amber-600'
               : 'from-rose-500 to-rose-600'
           }`}
-          onClick={() => navigate('/inventory/alerts')}
+          onClick={() => navigate('/operations/production-plan')}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-bold uppercase tracking-wider text-white/90">Supply Chain Resilience</CardTitle>

@@ -16,6 +16,8 @@ const getTransporter = () => {
   });
 };
 
+export const isEmailConfigured = () => getTransporter() !== null;
+
 const escapeHtml = (s) =>
   String(s ?? '')
     .replace(/&/g, '&amp;')

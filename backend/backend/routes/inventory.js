@@ -2,7 +2,7 @@ import { query } from '../config/database.js';
 import { clearInventoryRecommendationForProduct } from '../utils/procurementHelpers.js';
 import { parseBody, sendJSON, sendError } from '../utils/helpers.js';
 import { logAudit } from '../utils/logger.js';
-import { buildAlertEmailHtml, sendEmail } from '../utils/email.js';
+import { buildAlertEmailHtml, sendEmail, isEmailConfigured } from '../utils/email.js';
 import { getManySettings } from '../utils/systemSettings.js';
 
 const INVENTORY_TRANSACTION_TYPES = new Set([
@@ -23,6 +23,7 @@ export const handleGetInventory = async (req, res) => {
         p.name as product_name,
         p.category,
         p.unit_cost,
+        p.unit_price,
         p.reorder_point,
         p.safety_stock,
         p.lead_time_days,
@@ -440,7 +441,7 @@ export const generateAlertsFromInventory = async () => {
       }
     }
 
-    if (emailEnabled && recipients.length > 0 && alertsToEmail.length > 0) {
+    if (emailEnabled && isEmailConfigured() && recipients.length > 0 && alertsToEmail.length > 0) {
       try {
         const html = buildAlertEmailHtml({
           siteName: settings.site_name || 'Kinglion',
@@ -522,9 +523,18 @@ export const handleCreateInventoryTransaction = async (req, res) => {
       return sendError(res, 400, `Insufficient stock. Available: ${previousStock}, requested: ${Math.abs(delta)}`);
     }
     const newStock = Math.max(0, previousStock + delta);
-    const unitPrice = inputUnitPrice && Number.isFinite(inputUnitPrice) && inputUnitPrice >= 0
-      ? inputUnitPrice
-      : Number(inventory.unit_price || 0);
+    const catalogUnitPrice = Number(inventory.unit_price || 0);
+    const isOutboundSale = transactionType === 'sold' || transactionType === 'stock_out';
+    // Keep catalog list price for sold/stock-out revenue — transaction price cannot reduce product value.
+    let unitPrice = catalogUnitPrice;
+    if (!isOutboundSale) {
+      unitPrice =
+        inputUnitPrice && Number.isFinite(inputUnitPrice) && inputUnitPrice >= 0
+          ? inputUnitPrice
+          : catalogUnitPrice;
+    } else if (catalogUnitPrice <= 0 && inputUnitPrice && Number.isFinite(inputUnitPrice) && inputUnitPrice >= 0) {
+      unitPrice = inputUnitPrice;
+    }
     const totalAmount = (unitPrice > 0 && quantity > 0) ? unitPrice * quantity : 0;
 
     await query(
@@ -1034,6 +1044,40 @@ export const handleUpdateInventory = async (req, res) => {
   } catch (error) {
     console.error('Update inventory error:', error);
     sendError(res, 500, 'Failed to update inventory');
+  }
+};
+
+// Wipe all inventory-related transactional data (sales, orders, products, forecasts)
+export const handleDeleteAllInventoryData = async (req, res) => {
+  try {
+    const scope = req.query?.scope;
+    if (scope !== 'all') {
+      return sendError(res, 400, 'Specify scope=all to delete all inventory and transaction data. This cannot be undone.');
+    }
+
+    await query('DELETE FROM sales', []);
+    await query('DELETE FROM forecast_results', []);
+    await query('DELETE FROM inventory_recommendations', []);
+    await query('DELETE FROM production_plans', []);
+    await query('DELETE FROM procurement_orders', []);
+    await query('DELETE FROM alerts WHERE product_id IS NOT NULL', []);
+    await query(
+      `
+        DELETE FROM audit_logs
+        WHERE entity_type IN ('inventory', 'sale', 'product', 'procurement', 'forecast', 'production_plan', 'production')
+          OR action LIKE 'INVENTORY_%'
+          OR action LIKE 'DELETE_%'
+      `,
+      []
+    ).catch(() => {});
+    await query('DELETE FROM products', []);
+
+    await logAudit(req.user.id, 'DELETE_INVENTORY_ALL', 'inventory', null, { scope: 'all' }, req).catch(() => {});
+
+    sendJSON(res, 200, { success: true });
+  } catch (error) {
+    console.error('Delete all inventory data error:', error);
+    sendError(res, 500, 'Failed to delete inventory data');
   }
 };
 

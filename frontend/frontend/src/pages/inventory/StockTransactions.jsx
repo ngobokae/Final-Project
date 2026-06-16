@@ -218,6 +218,33 @@ export default function StockTransactions() {
     };
   }, [salesRows]);
 
+  const resolveProductPrice = (productId) => {
+    const product = products.find((p) => String(p.id) === String(productId));
+    return product?.unit_price != null ? String(product.unit_price) : '';
+  };
+
+  const handleProductChange = (productId) => {
+    setForm((prev) => {
+      const next = { ...prev, product_id: productId };
+      if (prev.transaction_type === 'sold' || prev.transaction_type === 'stock_out') {
+        next.unit_price = resolveProductPrice(productId);
+      }
+      return next;
+    });
+  };
+
+  const handleTransactionTypeChange = (transactionType) => {
+    setForm((prev) => {
+      const next = { ...prev, transaction_type: transactionType };
+      if (transactionType === 'sold' || transactionType === 'stock_out') {
+        next.unit_price = resolveProductPrice(prev.product_id);
+      } else {
+        next.unit_price = '';
+      }
+      return next;
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.product_id || !form.transaction_type || !form.quantity) {
@@ -242,6 +269,9 @@ export default function StockTransactions() {
       };
       if ((form.transaction_type === 'sold' || form.transaction_type === 'stock_out' || form.transaction_type === 'ordered') && form.unit_price) {
         payload.unit_price = Number(form.unit_price);
+      } else if (form.transaction_type === 'sold' || form.transaction_type === 'stock_out') {
+        const catalogPrice = resolveProductPrice(form.product_id);
+        if (catalogPrice) payload.unit_price = Number(catalogPrice);
       }
       if (form.transaction_type === 'sold' || form.transaction_type === 'stock_out' || form.transaction_type === 'ordered') {
         if (form.customer_name) payload.customer_name = form.customer_name;
@@ -522,7 +552,7 @@ export default function StockTransactions() {
           <form className="grid grid-cols-1 md:grid-cols-4 gap-3" onSubmit={handleSubmit}>
             <Select
               value={form.product_id}
-              onValueChange={(value) => setForm((prev) => ({ ...prev, product_id: value }))}
+              onValueChange={handleProductChange}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select product" />
@@ -538,7 +568,7 @@ export default function StockTransactions() {
 
             <Select
               value={form.transaction_type}
-              onValueChange={(value) => setForm((prev) => ({ ...prev, transaction_type: value }))}
+              onValueChange={handleTransactionTypeChange}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -571,9 +601,10 @@ export default function StockTransactions() {
                 type="number"
                 min="0"
                 step="0.01"
-                placeholder={form.transaction_type === 'sold' ? 'Unit price (for revenue)' : 'Unit amount (optional)'}
+                readOnly
+                placeholder="Product list price (fixed)"
                 value={form.unit_price}
-                onChange={(e) => setForm((prev) => ({ ...prev, unit_price: e.target.value }))}
+                className="bg-gray-50"
               />
             )}
 
