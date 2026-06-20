@@ -107,7 +107,7 @@ const getExportMeta = () => {
     return {
       email: 'system@kinglion.rw',
       preparedRole: 'Administrator',
-      approvedRole: 'Manager',
+      approvedRole: 'Operations Manager',
     };
   }
   try {
@@ -115,10 +115,10 @@ const getExportMeta = () => {
     return {
       email: user.email || 'N/A',
       preparedRole: formatRoleLabel(user.role),
-      approvedRole: 'Manager',
+      approvedRole: 'Operations Manager',
     };
   } catch {
-    return { email: 'N/A', preparedRole: 'Staff', approvedRole: 'Manager' };
+    return { email: 'N/A', preparedRole: 'Staff', approvedRole: 'Operations Manager' };
   }
 };
 
