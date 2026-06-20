@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FileText, Download, Calendar, Package, TrendingDown, TrendingUp, BarChart3, Loader2 } from 'lucide-react';
 import { apiGet } from '../../utils/api';
-import { downloadCsvReport, downloadExcelReport } from '../../utils/reportExport';
+import { downloadCsvReport, downloadExcelReport, downloadPdfReport } from '../../utils/reportExport';
 
 export default function InventoryReports() {
   const [selectedReport, setSelectedReport] = useState('stock');
@@ -95,7 +95,7 @@ export default function InventoryReports() {
     try {
       const result = await fetchReportById(reportId);
       if (!result) return;
-      downloadCsvReport(result.reportData, `${reportId}-report`);
+      downloadCsvReport(result.reportData, `${reportId}-report`, `${result.reportConfig.name} Report`);
     } catch (error) {
       console.error('Failed to download report:', error);
       alert('Failed to download report.');
@@ -110,6 +110,21 @@ export default function InventoryReports() {
     } catch (error) {
       console.error('Failed to download Excel report:', error);
       alert('Failed to download Excel report.');
+    }
+  };
+
+  const handleDownloadPdf = async (reportId) => {
+    try {
+      const result = await fetchReportById(reportId);
+      if (!result) return;
+      await downloadPdfReport(
+        result.reportData,
+        `${result.reportConfig.name} Report`,
+        `${reportId}-report`
+      );
+    } catch (error) {
+      console.error('Failed to download PDF report:', error);
+      alert('Failed to download PDF report.');
     }
   };
 
@@ -208,10 +223,17 @@ export default function InventoryReports() {
                 </button>
                 <button
                   onClick={() => handleDownloadExcel(report.id)}
-                  className="flex-1 min-w-[140px] px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors flex items-center justify-center gap-2 text-sm"
+                  className="flex-1 min-w-[120px] px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors flex items-center justify-center gap-2 text-sm"
                 >
                   <Download className="w-4 h-4" />
-                  Download Excel
+                  Excel
+                </button>
+                <button
+                  onClick={() => handleDownloadPdf(report.id)}
+                  className="flex-1 min-w-[120px] px-3 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-2 text-sm"
+                >
+                  <Download className="w-4 h-4" />
+                  PDF
                 </button>
               </div>
             </div>

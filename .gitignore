@@ -23,3 +23,6 @@ ml-service/ml-service/db.sqlite3
 
 # Logs
 npm-debug.log*
+
+# Generated report test files
+frontend/frontend/test-output/

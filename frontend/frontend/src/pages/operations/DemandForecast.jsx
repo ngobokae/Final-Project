@@ -147,7 +147,7 @@ export default function DemandForecast() {
         alert('No forecast data available to export. Generate predictions first.');
         return;
       }
-      downloadCsvReport(report, 'demand-forecast');
+      downloadCsvReport(report, 'demand-forecast', 'Demand Forecast Report');
     } catch (error) {
       console.error('Failed to export forecasts:', error);
       alert('Export failed. Please try again.');

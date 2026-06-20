@@ -1,20 +1,16 @@
 import { useState, useEffect } from 'react';
-import { FileText, Download, Calendar, DollarSign, BarChart3, Loader2, FileDown, ArrowUpDown } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { generateBusinessReport } from '../../utils/reportGenerator';
+import { FileText, Download, Calendar, DollarSign, BarChart3, Loader2, ArrowUpDown } from 'lucide-react';
 import { apiGet } from '../../utils/api';
 import { formatCurrency } from '../../utils/currency';
-import { downloadCsvReport, downloadExcelReport } from '../../utils/reportExport';
+import { downloadCsvReport, downloadExcelReport, downloadPdfReport } from '../../utils/reportExport';
 
 export default function ExecutiveReports() {
-  const { user } = useAuth();
   const [selectedReport, setSelectedReport] = useState('executive');
   const [dateRange, setDateRange] = useState('month');
   const [generating, setGenerating] = useState(false);
   const [reportData, setReportData] = useState(null);
   const [lastGeneratedReportId, setLastGeneratedReportId] = useState('');
   const [metrics, setMetrics] = useState(null);
-  const [pdfGenerating, setPdfGenerating] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState(null);
 
   const reports = [
@@ -97,7 +93,7 @@ export default function ExecutiveReports() {
     try {
       const result = await fetchReportById(reportId);
       if (!result) return;
-      downloadCsvReport(result.reportData, `${reportId}-report`);
+      downloadCsvReport(result.reportData, `${reportId}-report`, `${result.reportConfig.name} Report`);
     } catch (error) {
       console.error('Failed to download report CSV:', error);
       alert('Failed to download report CSV.');
@@ -115,19 +111,18 @@ export default function ExecutiveReports() {
     }
   };
 
-  const handleDownloadPdf = async () => {
-    setPdfGenerating(true);
+  const handleDownloadPdf = async (reportId) => {
     try {
-      const stats = await apiGet('/api/dashboard/stats');
-      const insightsRes = await apiGet('/api/insights?active=true');
-      const insights = Array.isArray(insightsRes) ? insightsRes : (insightsRes?.insights || []);
-      
-      await generateBusinessReport(user, stats, insights);
+      const result = await fetchReportById(reportId);
+      if (!result) return;
+      await downloadPdfReport(
+        result.reportData,
+        `${result.reportConfig.name} Report`,
+        `${reportId}-report`
+      );
     } catch (error) {
-      console.error('Failed to download PDF:', error);
-      alert('Failed to generate PDF report.');
-    } finally {
-      setPdfGenerating(false);
+      console.error('Failed to download PDF report:', error);
+      alert('Failed to download PDF report.');
     }
   };
 
@@ -232,16 +227,11 @@ export default function ExecutiveReports() {
                   Download Excel
                 </button>
                 <button
-                  onClick={handleDownloadPdf}
-                  disabled={pdfGenerating}
-                  className="flex-1 min-w-[140px] px-3 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                  onClick={() => handleDownloadPdf(report.id)}
+                  className="flex-1 min-w-[120px] px-3 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-2 text-sm"
                 >
-                  {pdfGenerating ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <FileDown className="w-4 h-4" />
-                  )}
-                  Download PDF
+                  <Download className="w-4 h-4" />
+                  PDF
                 </button>
               </div>
             </div>
