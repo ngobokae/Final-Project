@@ -1,15 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FileText, Download, Calendar, BarChart3, TrendingUp, Package, DollarSign, Loader2, ArrowUpDown } from 'lucide-react';
 import { formatCurrency } from '../../utils/currency';
 import { apiGet } from '../../utils/api';
 import { downloadCsvReport, downloadExcelReport, downloadPdfReport } from '../../utils/reportExport';
+import ReportDateRangePicker from '../../components/ReportDateRangePicker';
+import { validateReportDateRange, buildReportQueryString, formatReportDateRangeLabel } from '../../utils/reportDateRange';
 
 export default function OperationsReports() {
   const [selectedReport, setSelectedReport] = useState('sales');
-  const [dateRange, setDateRange] = useState('month');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [generating, setGenerating] = useState(false);
   const [reportData, setReportData] = useState(null);
   const [lastGeneratedReportId, setLastGeneratedReportId] = useState('');
+
+  useEffect(() => {
+    setReportData(null);
+    setLastGeneratedReportId('');
+  }, [startDate, endDate]);
 
   const reports = [
     {
@@ -49,19 +57,21 @@ export default function OperationsReports() {
     }
   ];
 
-  const getDaysFromRange = (range) => {
-    const map = { week: 7, month: 30, quarter: 90, year: 365 };
-    return map[range] || 30;
-  };
+  const getDateRangeError = () => validateReportDateRange(startDate, endDate);
 
   const handleGenerateReport = async () => {
+    const dateError = getDateRangeError();
+    if (dateError) {
+      alert(dateError);
+      return;
+    }
+
     try {
       setGenerating(true);
       const report = reports.find(r => r.id === selectedReport);
       if (!report) return;
 
-      const days = getDaysFromRange(dateRange);
-      const data = await apiGet(`${report.endpoint}?days=${days}`);
+      const data = await apiGet(`${report.endpoint}?${buildReportQueryString(startDate, endDate)}`);
       setReportData(data.report);
       setLastGeneratedReportId(report.id);
     } catch (error) {
@@ -73,10 +83,15 @@ export default function OperationsReports() {
   };
 
   const fetchReportById = async (reportId) => {
+    const dateError = getDateRangeError();
+    if (dateError) {
+      alert(dateError);
+      return null;
+    }
+
     const report = reports.find(r => r.id === reportId);
     if (!report) return null;
-    const days = getDaysFromRange(dateRange);
-    const data = await apiGet(`${report.endpoint}?days=${days}`);
+    const data = await apiGet(`${report.endpoint}?${buildReportQueryString(startDate, endDate)}`);
     return { reportConfig: report, reportData: data.report };
   };
 
@@ -131,7 +146,7 @@ export default function OperationsReports() {
       {/* Report Generator */}
       <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-6">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Generate Report</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Report Type</label>
             <select
@@ -144,23 +159,17 @@ export default function OperationsReports() {
               ))}
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
-            <select
-              value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-            >
-              <option value="week">Last 7 Days</option>
-              <option value="month">Last 30 Days</option>
-              <option value="quarter">Last Quarter</option>
-              <option value="year">Last Year</option>
-            </select>
-          </div>
+          <ReportDateRangePicker
+            startDate={startDate}
+            endDate={endDate}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
+            accentClass="focus:ring-emerald-500"
+          />
           <div className="flex items-end">
             <button
               onClick={handleGenerateReport}
-              disabled={generating}
+              disabled={generating || !startDate || !endDate}
               className="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {generating ? (
@@ -177,6 +186,9 @@ export default function OperationsReports() {
             </button>
           </div>
         </div>
+        <p className="text-sm text-gray-500 mt-3">
+          Select a start and end date to generate or download reports for that period only.
+        </p>
       </div>
 
       {/* Available Reports */}
@@ -196,7 +208,7 @@ export default function OperationsReports() {
                     {reportData && lastGeneratedReportId === report.id && (
                       <div className="flex items-center gap-1 text-xs text-emerald-600 mt-2">
                         <Calendar className="w-3 h-3" />
-                        Generated: {new Date().toLocaleDateString()}
+                        Period: {formatReportDateRangeLabel(startDate, endDate)}
                       </div>
                     )}
                   </div>
@@ -205,21 +217,24 @@ export default function OperationsReports() {
               <div className="mt-4 flex gap-2 flex-wrap">
                 <button
                   onClick={() => handleDownloadCsv(report.id)}
-                  className="flex-1 min-w-[140px] px-3 py-2 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors flex items-center justify-center gap-2 text-sm"
+                  disabled={!startDate || !endDate}
+                  className="flex-1 min-w-[140px] px-3 py-2 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-50"
                 >
                   <Download className="w-4 h-4" />
                   Download CSV
                 </button>
                 <button
                   onClick={() => handleDownloadExcel(report.id)}
-                  className="flex-1 min-w-[120px] px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors flex items-center justify-center gap-2 text-sm"
+                  disabled={!startDate || !endDate}
+                  className="flex-1 min-w-[120px] px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-50"
                 >
                   <Download className="w-4 h-4" />
                   Excel
                 </button>
                 <button
                   onClick={() => handleDownloadPdf(report.id)}
-                  className="flex-1 min-w-[120px] px-3 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-2 text-sm"
+                  disabled={!startDate || !endDate}
+                  className="flex-1 min-w-[120px] px-3 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-50"
                 >
                   <Download className="w-4 h-4" />
                   PDF

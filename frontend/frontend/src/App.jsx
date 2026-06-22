@@ -3,6 +3,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ConfirmDialogProvider } from './contexts/ConfirmDialogContext';
 import { useEffect } from 'react';
 import Landing from './pages/Landing';
+import AboutUs from './pages/AboutUs';
+import ContactUs from './pages/ContactUs';
 import Login from './pages/auth/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLayout from './layouts/AdminLayout';
@@ -99,6 +101,8 @@ function AppContent() {
       <CommandPalette />
       <Routes>
         <Route path="/" element={user ? <Navigate to={getHomePath(user.role)} replace /> : <Landing />} />
+        <Route path="/about" element={<AboutUs />} />
+        <Route path="/contact" element={<ContactUs />} />
         <Route path="/login" element={<Login />} />
         <Route path="/forget-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />

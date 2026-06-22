@@ -2,13 +2,29 @@ import { query } from '../config/database.js';
 import { sendJSON, sendError, parseBody, parseQuery } from '../utils/helpers.js';
 import { calculateNetRevenueMetrics, calculatePredictionRevenue } from '../utils/revenueMetrics.js';
 
+const parseReportDateRange = (queryParams, res) => {
+  const startDate = queryParams.start_date ? String(queryParams.start_date).slice(0, 10) : null;
+  const endDate = queryParams.end_date ? String(queryParams.end_date).slice(0, 10) : null;
+
+  if (!startDate || !endDate) {
+    sendError(res, 400, 'start_date and end_date are required');
+    return null;
+  }
+
+  if (startDate > endDate) {
+    sendError(res, 400, 'start_date must be on or before end_date');
+    return null;
+  }
+
+  return { startDate, endDate };
+};
+
 // Operations Reports
 export const handleGenerateSalesReport = async (req, res) => {
   try {
-    const queryParams = req.query || {};
-    const days = queryParams.days ? parseInt(queryParams.days) : 30;
-    const startDate = queryParams.start_date || new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const endDate = queryParams.end_date || new Date().toISOString().split('T')[0];
+    const range = parseReportDateRange(req.query || {}, res);
+    if (!range) return;
+    const { startDate, endDate } = range;
 
     const report = await query(`
       SELECT 
@@ -53,8 +69,9 @@ export const handleGenerateSalesReport = async (req, res) => {
 
 export const handleGenerateProductionReport = async (req, res) => {
   try {
-    const queryParams = req.query || {};
-    const days = queryParams.days ? parseInt(queryParams.days) : 30;
+    const range = parseReportDateRange(req.query || {}, res);
+    if (!range) return;
+    const { startDate, endDate } = range;
 
     const report = await query(`
       SELECT 
@@ -64,9 +81,9 @@ export const handleGenerateProductionReport = async (req, res) => {
         (pp.completed_quantity / pp.target_quantity * 100) as completion_rate
       FROM production_plans pp
       JOIN products p ON pp.product_id = p.id
-      WHERE pp.start_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+      WHERE pp.start_date >= ? AND pp.start_date <= ?
       ORDER BY pp.start_date DESC
-    `, [days]);
+    `, [startDate, endDate]);
 
     const summary = await query(`
       SELECT 
@@ -76,14 +93,14 @@ export const handleGenerateProductionReport = async (req, res) => {
         SUM(target_quantity) as total_target,
         SUM(completed_quantity) as total_completed
       FROM production_plans
-      WHERE start_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-    `, [days]);
+      WHERE start_date >= ? AND start_date <= ?
+    `, [startDate, endDate]);
 
     sendJSON(res, 200, {
       success: true,
       report: {
         type: 'production',
-        period: days,
+        period: { start: startDate, end: endDate },
         summary: summary[0] || {},
         details: report
       }
@@ -96,8 +113,9 @@ export const handleGenerateProductionReport = async (req, res) => {
 
 export const handleGenerateDemandForecastReport = async (req, res) => {
   try {
-    const queryParams = req.query || {};
-    const days = queryParams.days ? parseInt(queryParams.days) : 30;
+    const range = parseReportDateRange(req.query || {}, res);
+    if (!range) return;
+    const { startDate, endDate } = range;
 
     const report = await query(`
       SELECT 
@@ -106,10 +124,10 @@ export const handleGenerateDemandForecastReport = async (req, res) => {
         p.sku
       FROM forecast_results f
       JOIN products p ON f.product_id = p.id
-      WHERE f.forecast_date >= CURDATE() 
-        AND f.forecast_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
+      WHERE f.forecast_date >= ?
+        AND f.forecast_date <= ?
       ORDER BY f.forecast_date ASC, f.product_id
-    `, [days]);
+    `, [startDate, endDate]);
 
     const summary = await query(`
       SELECT 
@@ -118,15 +136,15 @@ export const handleGenerateDemandForecastReport = async (req, res) => {
         AVG(forecasted_demand) as avg_demand,
         AVG(confidence_level) as avg_confidence
       FROM forecast_results
-      WHERE forecast_date >= CURDATE() 
-        AND forecast_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
-    `, [days]);
+      WHERE forecast_date >= ?
+        AND forecast_date <= ?
+    `, [startDate, endDate]);
 
     sendJSON(res, 200, {
       success: true,
       report: {
         type: 'demand_forecast',
-        period: days,
+        period: { start: startDate, end: endDate },
         summary: summary[0] || {},
         details: report
       }
@@ -140,6 +158,10 @@ export const handleGenerateDemandForecastReport = async (req, res) => {
 // Inventory Reports
 export const handleGenerateStockLevelReport = async (req, res) => {
   try {
+    const range = parseReportDateRange(req.query || {}, res);
+    if (!range) return;
+    const { startDate, endDate } = range;
+
     const report = await query(`
       SELECT 
         i.*,
@@ -176,6 +198,7 @@ export const handleGenerateStockLevelReport = async (req, res) => {
       success: true,
       report: {
         type: 'stock_level',
+        period: { start: startDate, end: endDate },
         summary: summary[0] || {},
         details: report
       }
@@ -188,6 +211,10 @@ export const handleGenerateStockLevelReport = async (req, res) => {
 
 export const handleGenerateInventoryValuationReport = async (req, res) => {
   try {
+    const range = parseReportDateRange(req.query || {}, res);
+    if (!range) return;
+    const { startDate, endDate } = range;
+
     const report = await query(`
       SELECT 
         p.category,
@@ -216,6 +243,7 @@ export const handleGenerateInventoryValuationReport = async (req, res) => {
       success: true,
       report: {
         type: 'inventory_valuation',
+        period: { start: startDate, end: endDate },
         summary: summary[0] || {},
         details: report
       }
@@ -228,8 +256,9 @@ export const handleGenerateInventoryValuationReport = async (req, res) => {
 
 export const handleGenerateInventoryForecastErrorReport = async (req, res) => {
   try {
-    const queryParams = req.query || {};
-    const days = queryParams.days ? parseInt(queryParams.days) : 30;
+    const range = parseReportDateRange(req.query || {}, res);
+    if (!range) return;
+    const { startDate, endDate } = range;
 
     const rows = await query(`
       SELECT f.id, p.name as product_name, p.sku, f.forecast_date, f.forecasted_demand,
@@ -237,12 +266,12 @@ export const handleGenerateInventoryForecastErrorReport = async (req, res) => {
       FROM forecast_results f
       JOIN products p ON f.product_id = p.id
       LEFT JOIN sales s ON f.product_id = s.product_id AND DATE(s.sale_date) = f.forecast_date
-      WHERE f.forecast_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-        AND f.forecast_date <= CURDATE()
+      WHERE f.forecast_date >= ?
+        AND f.forecast_date <= ?
       GROUP BY f.id
       ORDER BY ABS(f.forecasted_demand - COALESCE(SUM(s.quantity), 0)) DESC
       LIMIT 500
-    `, [days]);
+    `, [startDate, endDate]);
 
     let totalAbsolute = 0;
     let totalSquared = 0;
@@ -288,7 +317,7 @@ export const handleGenerateInventoryForecastErrorReport = async (req, res) => {
       success: true,
       report: {
         type: 'inventory_forecast_error',
-        period: days,
+        period: { start: startDate, end: endDate },
         summary,
         details
       }
@@ -301,6 +330,10 @@ export const handleGenerateInventoryForecastErrorReport = async (req, res) => {
 
 export const handleGenerateInventoryABCAnalysisReport = async (req, res) => {
   try {
+    const range = parseReportDateRange(req.query || {}, res);
+    if (!range) return;
+    const { startDate, endDate } = range;
+
     const rows = await query(`
       SELECT p.id as product_id, p.name as product_name, p.sku, p.category,
         i.current_stock, i.available_stock, p.unit_cost,
@@ -348,6 +381,7 @@ export const handleGenerateInventoryABCAnalysisReport = async (req, res) => {
       success: true,
       report: {
         type: 'inventory_abc_analysis',
+        period: { start: startDate, end: endDate },
         summary,
         details
       }
@@ -360,8 +394,10 @@ export const handleGenerateInventoryABCAnalysisReport = async (req, res) => {
 
 export const handleGenerateInventoryTransactionsReport = async (req, res) => {
   try {
+    const range = parseReportDateRange(req.query || {}, res);
+    if (!range) return;
+    const { startDate, endDate } = range;
     const queryParams = req.query || {};
-    const days = queryParams.days ? parseInt(queryParams.days, 10) : 30;
     const limit = Math.max(1, Math.min(500, parseInt(queryParams.limit, 10) || 200));
 
     const logs = await query(
@@ -380,11 +416,12 @@ export const handleGenerateInventoryTransactionsReport = async (req, res) => {
             a.action LIKE 'INVENTORY_TXN_%'
             OR a.action = 'PROCUREMENT_STATUS_UPDATE'
           )
-          AND a.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+          AND DATE(a.created_at) >= ?
+          AND DATE(a.created_at) <= ?
         ORDER BY a.created_at DESC
         LIMIT ${limit}
       `,
-      [days]
+      [startDate, endDate]
     );
 
     const details = (logs || []).map((l) => {
@@ -462,7 +499,7 @@ export const handleGenerateInventoryTransactionsReport = async (req, res) => {
       success: true,
       report: {
         type: 'inventory_transactions',
-        period: days,
+        period: { start: startDate, end: endDate },
         summary,
         details,
       },
@@ -476,8 +513,9 @@ export const handleGenerateInventoryTransactionsReport = async (req, res) => {
 // Executive Reports
 export const handleGenerateExecutiveSummary = async (req, res) => {
   try {
-    const queryParams = req.query || {};
-    const days = queryParams.days ? parseInt(queryParams.days) : 30;
+    const range = parseReportDateRange(req.query || {}, res);
+    if (!range) return;
+    const { startDate, endDate } = range;
 
     const [salesSummary] = await query(`
       SELECT 
@@ -486,11 +524,12 @@ export const handleGenerateExecutiveSummary = async (req, res) => {
         COUNT(*) as transactions,
         AVG(total_amount) as avg_order_value
       FROM sales
-      WHERE sale_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-    `, [days]);
+      WHERE sale_date >= ? AND sale_date <= ?
+    `, [startDate, endDate]);
 
+    const days = Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / 86400000) + 1);
     const revenueMetrics = await calculateNetRevenueMetrics(days);
-    const prediction30 = await calculatePredictionRevenue(30);
+    const predictionInRange = await calculatePredictionRevenue(days);
 
     const [productionSummary] = await query(`
       SELECT 
@@ -498,8 +537,8 @@ export const handleGenerateExecutiveSummary = async (req, res) => {
         SUM(target_quantity) as target_units,
         SUM(completed_quantity) as completed_units
       FROM production_plans
-      WHERE start_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-    `, [days]);
+      WHERE start_date >= ? AND start_date <= ?
+    `, [startDate, endDate]);
 
     const [inventorySummary] = await query(`
       SELECT 
@@ -517,8 +556,8 @@ export const handleGenerateExecutiveSummary = async (req, res) => {
         SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) as delivered_orders,
         SUM(CASE WHEN status = 'delivered' THEN total_cost ELSE 0 END) as delivered_spend
       FROM procurement_orders
-      WHERE order_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-    `, [days]);
+      WHERE order_date >= ? AND order_date <= ?
+    `, [startDate, endDate]);
 
     const recentTransactions = await query(
       `
@@ -531,11 +570,12 @@ export const handleGenerateExecutiveSummary = async (req, res) => {
         LEFT JOIN users u ON u.id = a.user_id
         WHERE a.entity_type = 'inventory'
           AND a.action LIKE 'INVENTORY_TXN_%'
-          AND a.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+          AND DATE(a.created_at) >= ?
+          AND DATE(a.created_at) <= ?
         ORDER BY a.created_at DESC
         LIMIT 25
       `,
-      [days]
+      [startDate, endDate]
     );
 
     const transactionHistory = (recentTransactions || []).map((l) => {
@@ -568,14 +608,14 @@ export const handleGenerateExecutiveSummary = async (req, res) => {
       success: true,
       report: {
         type: 'executive_summary',
-        period: days,
+        period: { start: startDate, end: endDate },
         sales: {
           ...(salesSummary || {}),
           gross_sales_revenue: Number(salesSummary?.revenue || 0),
           revenue: revenueMetrics.net_revenue,
           net_revenue: revenueMetrics.net_revenue,
           actual_revenue: revenueMetrics.actual_revenue,
-          prediction_revenue: prediction30.prediction_revenue,
+          prediction_revenue: predictionInRange.prediction_revenue,
           procurement_deductions: revenueMetrics.procurement_deductions,
         },
         production: productionSummary || {},
@@ -592,18 +632,19 @@ export const handleGenerateExecutiveSummary = async (req, res) => {
 
 export const handleGenerateFinancialReport = async (req, res) => {
   try {
-    const queryParams = req.query || {};
-    const days = queryParams.days ? parseInt(queryParams.days) : 30;
+    const range = parseReportDateRange(req.query || {}, res);
+    if (!range) return;
+    const { startDate, endDate } = range;
 
     const revenue = await query(`
       SELECT 
         DATE(sale_date) as date,
         SUM(total_amount) as revenue
       FROM sales
-      WHERE sale_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+      WHERE sale_date >= ? AND sale_date <= ?
       GROUP BY DATE(sale_date)
       ORDER BY date ASC
-    `, [days]);
+    `, [startDate, endDate]);
 
     const costs = await query(`
       SELECT 
@@ -611,23 +652,24 @@ export const handleGenerateFinancialReport = async (req, res) => {
         SUM(total_cost) as cost
       FROM procurement_orders
       WHERE status = 'delivered'
-        AND COALESCE(actual_delivery, updated_at, order_date) >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+        AND DATE(COALESCE(actual_delivery, updated_at, order_date)) >= ?
+        AND DATE(COALESCE(actual_delivery, updated_at, order_date)) <= ?
       GROUP BY DATE(COALESCE(actual_delivery, updated_at, order_date))
       ORDER BY date ASC
-    `, [days]);
+    `, [startDate, endDate]);
 
     const [summary] = await query(`
       SELECT 
-        (SELECT SUM(total_amount) FROM sales WHERE sale_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)) as total_revenue,
-        (SELECT SUM(total_cost) FROM procurement_orders WHERE status = 'delivered' AND COALESCE(actual_delivery, updated_at, order_date) >= DATE_SUB(CURDATE(), INTERVAL ? DAY)) as total_costs,
+        (SELECT SUM(total_amount) FROM sales WHERE sale_date >= ? AND sale_date <= ?) as total_revenue,
+        (SELECT SUM(total_cost) FROM procurement_orders WHERE status = 'delivered' AND DATE(COALESCE(actual_delivery, updated_at, order_date)) >= ? AND DATE(COALESCE(actual_delivery, updated_at, order_date)) <= ?) as total_costs,
         (SELECT SUM(i.current_stock * p.unit_cost) FROM inventory i JOIN products p ON i.product_id = p.id WHERE p.is_active = TRUE) as inventory_value
-    `, [days, days]);
+    `, [startDate, endDate, startDate, endDate]);
 
     sendJSON(res, 200, {
       success: true,
       report: {
         type: 'financial',
-        period: days,
+        period: { start: startDate, end: endDate },
         summary: summary || {},
         revenue: revenue,
         costs: costs
