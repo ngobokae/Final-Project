@@ -5,7 +5,7 @@ import { Progress } from '../../components/ui/progress';
 import { Button } from '../../components/ui/button';
 import {
   Users, Upload, Brain, Activity, AlertTriangle, CheckCircle, TrendingUp, TrendingDown,
-  ArrowRight, Clock, Shield, Zap, Circle
+  ArrowRight, Clock, Shield, Zap, Circle, MessageSquare
 } from 'lucide-react';
 import {
   BarChart as RechartsBarChart, Bar,
@@ -48,6 +48,7 @@ export default function AdminDashboard() {
   const [recentActivity, setRecentActivity] = useState([]);
   const [security, setSecurity] = useState({ loginsToday: 0, loginsThisWeek: 0, failedLoginsWeek: 0 });
   const [services, setServices] = useState({ database: true, api: true, ml: false });
+  const [websiteContactUnread, setWebsiteContactUnread] = useState(0);
 
   useEffect(() => {
     fetchDashboardData();
@@ -57,10 +58,13 @@ export default function AdminDashboard() {
     try {
       setLoading(true);
 
-      const [adminData, healthData] = await Promise.all([
+      const [adminData, healthData, contactData] = await Promise.all([
         apiGet('/api/admin/dashboard?days=30').catch(() => ({})),
         apiGet('/api/admin/health-status').catch(() => ({ services: {} })),
+        apiGet('/api/contact/unread-count').catch(() => ({ unread: 0 })),
       ]);
+
+      setWebsiteContactUnread(Number(contactData.unread || 0));
 
       const usersBlock = adminData.users || {};
       const uploads = adminData.uploads || {};
@@ -177,6 +181,18 @@ export default function AdminDashboard() {
       iconBg: 'bg-amber-500',
       to: '/admin/audit-logs',
       hint: 'View system alerts',
+    },
+    {
+      title: 'Website Contact',
+      value: websiteContactUnread,
+      change: websiteContactUnread > 0 ? 'New' : 'Clear',
+      trend: websiteContactUnread > 0 ? 'down' : 'up',
+      subtitle: websiteContactUnread > 0 ? 'Unread public messages' : 'No new enquiries',
+      icon: MessageSquare,
+      bgGradient: 'from-red-500/10 to-red-600/10',
+      iconBg: 'bg-red-500',
+      to: '/admin/messages?tab=website',
+      hint: 'View Contact Us submissions',
     },
   ];
 

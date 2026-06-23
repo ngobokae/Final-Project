@@ -20,6 +20,7 @@ import * as adminRoutes from './routes/admin.js';
 import * as demandModelsRoutes from './routes/demandModels.js';
 import * as reportsRoutes from './routes/reports.js';
 import * as messagesRoutes from './routes/messages.js';
+import * as contactRoutes from './routes/contact.js';
 import { sendError } from './utils/helpers.js';
 import { checkPermission } from './utils/permissions.js';
 
@@ -197,6 +198,12 @@ const routes = {
   'GET /api/messages/:id': { handler: messagesRoutes.handleGetMessageThread, auth: true },
   'PUT /api/messages/:id/read': { handler: messagesRoutes.handleMarkMessageRead, auth: true },
   'GET /api/messages/attachments/:id': { handler: messagesRoutes.handleGetAttachment, auth: true },
+
+  // Public website contact + admin inbox
+  'POST /api/contact': { handler: contactRoutes.handleSubmitContact, auth: false },
+  'GET /api/contact/inquiries': { handler: contactRoutes.handleGetContactInquiries, auth: true, roles: ['admin'] },
+  'GET /api/contact/unread-count': { handler: contactRoutes.handleGetContactUnreadCount, auth: true, roles: ['admin'] },
+  'PUT /api/contact/inquiries/:id/read': { handler: contactRoutes.handleMarkContactInquiryRead, auth: true, roles: ['admin'] },
 };
 
 const matchRoute = (method, pathname) => {

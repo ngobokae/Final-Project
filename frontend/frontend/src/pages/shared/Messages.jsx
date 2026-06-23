@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import {
   MessageSquare, Send, Paperclip, Inbox, ArrowLeft, X,
   FileText, CheckCircle2, AlertCircle, Pencil, Search,
-  MoreHorizontal, ChevronDown, Clock, User
+  MoreHorizontal, ChevronDown, Clock, User, Globe
 } from 'lucide-react';
-import { apiGet, apiPost } from '../../utils/api';
+import { apiGet, apiPost, apiPut } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
@@ -62,9 +63,13 @@ function FileChip({ file, onRemove }) {
 
 export default function Messages() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const isAdmin = user?.role === 'admin';
   const [tab, setTab] = useState('inbox');
   const [messages, setMessages] = useState([]);
+  const [inquiries, setInquiries] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [selectedInquiry, setSelectedInquiry] = useState(null);
   const [thread, setThread] = useState(null);
   const [users, setUsers] = useState([]);
   const [compose, setCompose] = useState({ to: '', subject: '', body: '', files: [] });
@@ -78,6 +83,7 @@ export default function Messages() {
   const replyFileRef = useRef(null);
   const messagesEndRef = useRef(null);
   const unreadCount = messages.filter(m => m && (m.is_read === false || m.is_read === 0)).length;
+  const websiteUnreadCount = inquiries.filter(i => i.is_read === false || i.is_read === 0).length;
 
   const filteredMessages = messages.filter(m => {
     if (!search) return true;
@@ -86,6 +92,17 @@ export default function Messages() {
       (m.other_name || m.sender_name || '').toLowerCase().includes(q) ||
       (m.subject || '').toLowerCase().includes(q) ||
       (m.body || '').toLowerCase().includes(q)
+    );
+  });
+
+  const filteredInquiries = inquiries.filter((item) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      (item.name || '').toLowerCase().includes(q) ||
+      (item.email || '').toLowerCase().includes(q) ||
+      (item.subject || '').toLowerCase().includes(q) ||
+      (item.body || '').toLowerCase().includes(q)
     );
   });
 
@@ -99,6 +116,19 @@ export default function Messages() {
     } finally { setLoading(false); }
   };
 
+  const loadContactInquiries = async () => {
+    if (!isAdmin) return;
+    setLoading(true);
+    try {
+      const data = await apiGet('/api/contact/inquiries');
+      setInquiries(data.inquiries || []);
+    } catch (e) {
+      setMsg({ type: 'error', text: 'Failed to load website contact messages' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadUsers = async () => {
     try {
       const data = await apiGet('/api/users/list');
@@ -106,13 +136,25 @@ export default function Messages() {
     } catch (e) { console.error('Failed to load users', e); }
   };
 
-  useEffect(() => { loadMessages(); }, [tab]);
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab');
+    if (requestedTab === 'website' && isAdmin) setTab('website');
+    else if (requestedTab === 'sent') setTab('sent');
+    else if (requestedTab === 'inbox') setTab('inbox');
+  }, [searchParams, isAdmin]);
+
+  useEffect(() => {
+    if (tab === 'website') loadContactInquiries();
+    else loadMessages();
+  }, [tab, isAdmin]);
+
   useEffect(() => { loadUsers(); }, []);
   useEffect(() => {
     if (thread?.thread) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [thread]);
 
   const loadThread = async (m) => {
+    setSelectedInquiry(null);
     setSelected(m); setThread(null); setShowCompose(false); setThreadLoading(true);
     try {
       const data = await apiGet(`/api/messages/${m.id}`);
@@ -127,6 +169,22 @@ export default function Messages() {
     } catch (e) {
       setMsg({ type: 'error', text: 'Failed to load message' });
     } finally { setThreadLoading(false); }
+  };
+
+  const loadContactInquiry = async (inquiry) => {
+    setSelected(null);
+    setThread(null);
+    setShowCompose(false);
+    setSelectedInquiry(inquiry);
+
+    if (inquiry.is_read === false || inquiry.is_read === 0) {
+      try {
+        await apiPut(`/api/contact/inquiries/${inquiry.id}/read`, {});
+        loadContactInquiries();
+      } catch (e) {
+        console.error('Failed to mark inquiry read', e);
+      }
+    }
   };
 
   const handleSendNew = async (e) => {
@@ -241,15 +299,22 @@ export default function Messages() {
           <div className="w-80 flex-shrink-0 flex flex-col bg-white dark:bg-neutral-900 rounded-2xl border border-gray-100 dark:border-neutral-800 shadow-sm overflow-hidden">
 
             {/* Tabs */}
-            <div className="p-3 border-b border-gray-100 dark:border-neutral-800 flex gap-1.5">
+            <div className="p-3 border-b border-gray-100 dark:border-neutral-800 flex gap-1.5 flex-wrap">
               {[
                 { id: 'inbox', label: 'Inbox', icon: Inbox },
                 { id: 'sent', label: 'Sent', icon: Send },
+                ...(isAdmin ? [{ id: 'website', label: 'Website', icon: Globe }] : []),
               ].map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
-                  onClick={() => { setTab(id); setSelected(null); setThread(null); setShowCompose(false); }}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                  onClick={() => {
+                    setTab(id);
+                    setSelected(null);
+                    setSelectedInquiry(null);
+                    setThread(null);
+                    setShowCompose(false);
+                  }}
+                  className={`flex-1 min-w-[88px] flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                     tab === id
                       ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm'
                       : 'text-gray-500 dark:text-neutral-400 hover:bg-gray-50 dark:hover:bg-neutral-800 hover:text-gray-900 dark:hover:text-white'
@@ -262,6 +327,13 @@ export default function Messages() {
                       tab === 'inbox' ? 'bg-white/20 text-white dark:bg-gray-900/20 dark:text-gray-900' : 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
                     }`}>
                       {unreadCount}
+                    </span>
+                  )}
+                  {id === 'website' && websiteUnreadCount > 0 && (
+                    <span className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold ${
+                      tab === 'website' ? 'bg-white/20 text-white dark:bg-gray-900/20 dark:text-gray-900' : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'
+                    }`}>
+                      {websiteUnreadCount}
                     </span>
                   )}
                 </button>
@@ -288,6 +360,71 @@ export default function Messages() {
                   <div className="w-7 h-7 border-2 border-gray-200 dark:border-neutral-700 border-t-gray-900 dark:border-t-white rounded-full animate-spin" />
                   <p className="text-xs text-gray-400 dark:text-neutral-500">Loading…</p>
                 </div>
+              ) : tab === 'website' ? (
+                filteredInquiries.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-3 px-6 text-center">
+                    <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-neutral-800 flex items-center justify-center">
+                      <Globe className="w-5 h-5 text-gray-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700 dark:text-neutral-300">
+                        {search ? 'No results' : 'No website contact messages'}
+                      </p>
+                      <p className="text-xs text-gray-400 dark:text-neutral-500 mt-1">
+                        Messages from the public Contact Us form will appear here
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-50 dark:divide-neutral-800/60">
+                    {filteredInquiries.map((item) => {
+                      const isUnread = item.is_read === false || item.is_read === 0;
+                      const isActive = selectedInquiry?.id === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => loadContactInquiry(item)}
+                          className={`w-full text-left px-4 py-3.5 transition-all duration-150 ${
+                            isActive
+                              ? 'bg-gray-900 dark:bg-white'
+                              : 'hover:bg-gray-50 dark:hover:bg-neutral-800/60'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <Avatar name={item.name} size="sm" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-1 mb-0.5">
+                                <span className={`text-xs font-bold truncate ${
+                                  isActive ? 'text-white dark:text-gray-900' : 'text-gray-900 dark:text-white'
+                                }`}>
+                                  {item.name}
+                                </span>
+                                <span className={`text-[10px] flex-shrink-0 ${
+                                  isActive ? 'text-gray-300 dark:text-gray-500' : 'text-gray-400 dark:text-neutral-500'
+                                }`}>
+                                  {formatDate(item.created_at)}
+                                </span>
+                              </div>
+                              <p className={`text-[11px] font-semibold truncate mb-0.5 ${
+                                isActive ? 'text-gray-200 dark:text-gray-700' : isUnread ? 'text-gray-800 dark:text-neutral-200' : 'text-gray-600 dark:text-neutral-400'
+                              }`}>
+                                {item.subject}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                {isUnread && <div className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />}
+                                <p className={`text-[11px] truncate leading-relaxed ${
+                                  isActive ? 'text-gray-300 dark:text-gray-600' : 'text-gray-400 dark:text-neutral-500'
+                                }`}>
+                                  {item.body?.slice(0, 55)}{item.body?.length > 55 ? '…' : ''}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )
               ) : filteredMessages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full gap-3 px-6 text-center">
                   <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-neutral-800 flex items-center justify-center">
@@ -460,7 +597,7 @@ export default function Messages() {
             )}
 
             {/* ── Empty state (no compose, no selected) ── */}
-            {!showCompose && !selected && (
+            {!showCompose && !selected && !selectedInquiry && (
               <div className="flex-1 flex flex-col items-center justify-center gap-5 px-8 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-neutral-800 flex items-center justify-center">
                   <MessageSquare className="w-7 h-7 text-gray-400" />
@@ -476,6 +613,48 @@ export default function Messages() {
                   <Pencil className="w-3.5 h-3.5" /> Compose
                 </Button>
               </div>
+            )}
+
+            {/* ── Website contact detail ── */}
+            {selectedInquiry && (
+              <>
+                <div className="px-6 py-4 border-b border-gray-100 dark:border-neutral-800 flex items-center gap-4 flex-shrink-0">
+                  <button
+                    onClick={() => setSelectedInquiry(null)}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 dark:hover:bg-neutral-800 hover:text-gray-700 dark:hover:text-white transition-all"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </button>
+                  <Avatar name={selectedInquiry.name} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{selectedInquiry.name}</p>
+                    <p className="text-xs text-gray-400 dark:text-neutral-500 truncate mt-0.5">{selectedInquiry.email}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-neutral-500">
+                    <Clock className="w-3.5 h-3.5" />
+                    {formatFullDate(selectedInquiry.created_at)}
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto px-7 py-6 space-y-5">
+                  <div className="rounded-2xl border border-red-100 dark:border-red-900/40 bg-red-50/60 dark:bg-red-950/20 p-4">
+                    <p className="text-xs font-bold uppercase tracking-widest text-red-600 mb-1">Website Contact</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{selectedInquiry.subject}</p>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-neutral-500 mb-1">From</p>
+                      <p className="text-sm text-gray-800 dark:text-neutral-200">{selectedInquiry.name}</p>
+                      <a href={`mailto:${selectedInquiry.email}`} className="text-sm text-red-600 hover:underline">{selectedInquiry.email}</a>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-neutral-500 mb-2">Message</p>
+                      <div className="rounded-2xl border border-gray-100 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-800/60 p-5 text-sm text-gray-700 dark:text-neutral-300 whitespace-pre-wrap leading-relaxed">
+                        {selectedInquiry.body}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
 
             {/* ── Thread view ── */}

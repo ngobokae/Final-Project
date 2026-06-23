@@ -56,6 +56,7 @@ import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
 
 import CommandPalette from './components/CommandPalette';
+import ScrollToTop from './components/ScrollToTop';
 
 function AppContent() {
   const { user, isLoading } = useAuth();
@@ -191,6 +192,7 @@ export default function App() {
     <AuthProvider>
       <ConfirmDialogProvider>
         <Router>
+          <ScrollToTop />
           <div className="min-h-screen bg-gray-50 dark:bg-neutral-950">
             <AppContent />
           </div>

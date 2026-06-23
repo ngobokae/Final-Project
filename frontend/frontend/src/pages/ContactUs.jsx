@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import LandingNavbar from '../components/LandingNavbar';
 import LandingFooter from '../components/LandingFooter';
 import { Button } from '../components/ui/button';
+import { apiPost } from '../utils/api';
 import {
   ArrowRight,
   Building2,
@@ -59,19 +60,32 @@ const offices = [
 export default function ContactUs() {
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const handleChange = (field) => (e) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const body = encodeURIComponent(
-      `Name: ${form.name}\nEmail: ${form.email}\n\n${form.message}`
-    );
-    const subject = encodeURIComponent(form.subject || 'KINGLION Website Enquiry');
-    window.location.href = `mailto:info@kinglion.co.tz?subject=${subject}&body=${body}`;
-    setSubmitted(true);
+    setSubmitting(true);
+    setError('');
+
+    try {
+      await apiPost('/api/contact', {
+        name: form.name,
+        email: form.email,
+        subject: form.subject,
+        body: form.message,
+      });
+      setSubmitted(true);
+      setForm({ name: '', email: '', subject: '', message: '' });
+    } catch (err) {
+      setError(err.message || 'Failed to send your message. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -134,10 +148,15 @@ export default function ContactUs() {
             {submitted ? (
               <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-6 text-emerald-800">
                 <p className="font-semibold mb-1">Thank you for reaching out.</p>
-                <p className="text-sm">Your email client should have opened. If it did not, write to info@kinglion.co.tz directly.</p>
+                <p className="text-sm">Your message was sent to our admin team. We will get back to you during business hours.</p>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
+                {error && (
+                  <div className="rounded-2xl bg-red-50 border border-red-200 p-4 text-sm text-red-700">
+                    {error}
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-neutral-700 mb-1">Full Name</label>
@@ -182,8 +201,8 @@ export default function ContactUs() {
                     placeholder="Tell us about your enquiry..."
                   />
                 </div>
-                <Button type="submit" className="!bg-gradient-to-r !from-neutral-900 !to-red-700 !text-white h-11 px-6 font-bold">
-                  Send Message <Send className="w-4 h-4 ml-2" />
+                <Button type="submit" disabled={submitting} className="!bg-gradient-to-r !from-neutral-900 !to-red-700 !text-white h-11 px-6 font-bold disabled:opacity-60">
+                  {submitting ? 'Sending...' : 'Send Message'} <Send className="w-4 h-4 ml-2" />
                 </Button>
               </form>
             )}
