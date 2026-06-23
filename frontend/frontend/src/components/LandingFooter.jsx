@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom';
 import logoSrc from '../assets/IMG_1472.PNG';
+import { scrollPageToTop } from '../utils/scrollToTop';
 
-const scrollToTop = () => {
-  window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+const handleFooterNav = () => () => {
+  requestAnimationFrame(() => scrollPageToTop());
+  setTimeout(scrollPageToTop, 50);
 };
 
 export default function LandingFooter() {
@@ -27,12 +29,12 @@ export default function LandingFooter() {
             <h4 className="font-bold text-white mb-2 text-sm">Navigation</h4>
             <ul className="space-y-1 text-xs">
               <li>
-                <Link to="/about" onClick={scrollToTop} className="text-neutral-400 hover:text-red-400 transition-colors duration-200">
+                <Link to="/about" onClick={handleFooterNav()} className="text-neutral-400 hover:text-red-400 transition-colors duration-200">
                   About Us
                 </Link>
               </li>
               <li>
-                <Link to="/contact" onClick={scrollToTop} className="text-neutral-400 hover:text-red-400 transition-colors duration-200">
+                <Link to="/contact" onClick={handleFooterNav()} className="text-neutral-400 hover:text-red-400 transition-colors duration-200">
                   Contact Us
                 </Link>
               </li>

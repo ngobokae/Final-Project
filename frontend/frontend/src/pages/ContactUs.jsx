@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import LandingNavbar from '../components/LandingNavbar';
 import LandingFooter from '../components/LandingFooter';
 import { Button } from '../components/ui/button';
 import { apiPost } from '../utils/api';
+import { scrollPageToTop } from '../utils/scrollToTop';
 import {
   ArrowRight,
   Building2,
@@ -60,8 +61,13 @@ const offices = [
 export default function ContactUs() {
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    scrollPageToTop();
+  }, []);
 
   const handleChange = (field) => (e) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -79,8 +85,10 @@ export default function ContactUs() {
         subject: form.subject,
         body: form.message,
       });
+      setSubmittedEmail(form.email);
       setSubmitted(true);
       setForm({ name: '', email: '', subject: '', message: '' });
+      scrollPageToTop();
     } catch (err) {
       setError(err.message || 'Failed to send your message. Please try again.');
     } finally {
@@ -141,14 +149,17 @@ export default function ContactUs() {
               <MessageSquare className="w-6 h-6 text-red-600" />
               <div>
                 <h2 className="text-2xl font-black text-neutral-900">Send a Message</h2>
-                <p className="text-sm text-neutral-500">Fill in the form and your email app will open ready to send.</p>
+                <p className="text-sm text-neutral-500">Your message goes directly to our admin team — no email app needed.</p>
               </div>
             </div>
 
             {submitted ? (
               <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-6 text-emerald-800">
-                <p className="font-semibold mb-1">Thank you for reaching out.</p>
-                <p className="text-sm">Your message was sent to our admin team. We will get back to you during business hours.</p>
+                <p className="font-semibold mb-1">Thanks for reaching out!</p>
+                <p className="text-sm">
+                  Your message was sent successfully. We will contact you using the email you provided
+                  {submittedEmail ? ` (${submittedEmail})` : ''}.
+                </p>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">

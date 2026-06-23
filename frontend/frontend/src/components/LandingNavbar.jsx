@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { Button } from './ui/button';
 import logoSrc from '../assets/IMG_1472.PNG';
+import { scrollPageToTop } from '../utils/scrollToTop';
 
 const navLinks = [
   { label: 'Home', to: '/' },
@@ -9,18 +10,23 @@ const navLinks = [
   { label: 'Contact Us', to: '/contact' },
 ];
 
-const scrollToTop = () => {
-  window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-};
-
 export default function LandingNavbar() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const handleNavClick = (to) => () => {
+    if (location.pathname === to) {
+      scrollPageToTop();
+    } else {
+      requestAnimationFrame(() => scrollPageToTop());
+      setTimeout(scrollPageToTop, 50);
+    }
+  };
+
   return (
     <nav className="sticky top-0 z-50 bg-white/85 backdrop-blur-md border-b border-neutral-200/60 shadow-sm">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-6">
-        <Link to="/" onClick={scrollToTop} className="flex items-center gap-3 hover:opacity-90 transition-opacity">
+        <Link to="/" onClick={handleNavClick('/')} className="flex items-center gap-3 hover:opacity-90 transition-opacity">
           <img src={logoSrc} alt="KINGLION" className="h-11 w-11 object-cover rounded-lg shadow-md" />
           <div>
             <p className="text-xl font-bold bg-gradient-to-r from-neutral-900 to-red-700 bg-clip-text text-transparent">
@@ -37,7 +43,7 @@ export default function LandingNavbar() {
               <Link
                 key={link.to}
                 to={link.to}
-                onClick={scrollToTop}
+                onClick={handleNavClick(link.to)}
                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
                   active
                     ? 'bg-red-50 text-red-700'
@@ -65,7 +71,7 @@ export default function LandingNavbar() {
             <Link
               key={link.to}
               to={link.to}
-              onClick={scrollToTop}
+              onClick={handleNavClick(link.to)}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap ${
                 active ? 'bg-red-100 text-red-700' : 'bg-neutral-100 text-neutral-600'
               }`}

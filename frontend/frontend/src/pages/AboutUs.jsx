@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
 import LandingNavbar from '../components/LandingNavbar';
 import LandingFooter from '../components/LandingFooter';
+import { scrollPageToTop } from '../utils/scrollToTop';
 import {
   ArrowRight,
   Award,
@@ -37,6 +39,10 @@ const milestones = [
 ];
 
 export default function AboutUs() {
+  useEffect(() => {
+    scrollPageToTop();
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-neutral-50 via-white to-red-50/30">
       <LandingNavbar />
