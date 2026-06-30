@@ -67,7 +67,7 @@ export const ensureForecastSchema = async () => {
   const columnNames = new Set(existingColumns.map((row) => row.COLUMN_NAME));
 
   const optionalColumns = [
-    { name: 'unit_price', definition: 'DECIMAL(10,2) DEFAULT 0' },
+    { name: 'unit_price', definition: 'DECIMAL(15,2) DEFAULT 0' },
     { name: 'confidence', definition: 'DECIMAL(5,4) DEFAULT 0.95' },
     { name: 'model', definition: "VARCHAR(100) DEFAULT 'ensemble'" },
     { name: 'source', definition: "VARCHAR(100) DEFAULT 'system'" },
