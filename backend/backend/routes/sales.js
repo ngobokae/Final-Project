@@ -532,10 +532,13 @@ export const handleUploadSales = async (req, res) => {
           );
           resolvedProductId = insertResult.insertId;
           
-          // Also create initial inventory record
+          // Also create initial inventory record (available_stock is a generated column)
+          const initialStock = looksLikeInventoryReport
+            ? Math.max(0, parseNum(get(rowAny, ['current_stock', 'current stock', 'stock'])) || 0)
+            : 0;
           await query(
-            'INSERT INTO inventory (product_id, current_stock, available_stock) VALUES (?, 0, 0)',
-            [resolvedProductId]
+            'INSERT INTO inventory (product_id, current_stock, reserved_stock) VALUES (?, ?, 0)',
+            [resolvedProductId, initialStock]
           );
           
           console.log(`Auto-created product: ${name} (${sku})`);
