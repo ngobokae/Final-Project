@@ -94,13 +94,11 @@ export default function StockTransactions() {
       const recList = Array.isArray(recsRes)
         ? recsRes
         : recsRes?.recommendations || recsRes?.data || [];
-      const lowStockRecs = recList.filter((rec) => {
-        const qty = Number(rec?.effective_order_quantity ?? rec?.optimal_order_quantity ?? 0);
-        const stock = Number(rec?.current_stock ?? rec?.available_stock ?? 0);
-        const reorder = Number(rec?.reorder_point ?? 0);
-        return qty > 0 && stock < reorder;
-      });
-      setRecommendations(lowStockRecs.slice(0, 20));
+      setRecommendations(
+        recList
+          .filter((rec) => Number(rec?.effective_order_quantity ?? rec?.optimal_order_quantity ?? 0) > 0)
+          .slice(0, 20)
+      );
       const salesRes = await apiGet('/api/sales?limit=500');
       setSalesRows(salesRes?.sales || []);
     } catch (e) {

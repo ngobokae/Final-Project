@@ -23,7 +23,7 @@ import * as messagesRoutes from './routes/messages.js';
 import * as contactRoutes from './routes/contact.js';
 import { sendError } from './utils/helpers.js';
 import { checkPermission } from './utils/permissions.js';
-import { ensureMoneyColumnPrecision } from './utils/schema.js';
+import { ensureMoneyColumnPrecision, ensureRecommendationSchema } from './utils/schema.js';
 
 import { initSocket } from './utils/socket.js';
 
@@ -311,6 +311,11 @@ server.listen(PORT, async () => {
     console.log('✅ Money column precision ready');
   } catch (error) {
     console.error('⚠️ Money column migration failed:', error.message);
+  }
+  try {
+    await ensureRecommendationSchema();
+  } catch (error) {
+    console.error('⚠️ Recommendation schema init failed:', error.message);
   }
   console.log(`🚀 Pure Node.js Backend Server running on http://localhost:${PORT}`);
   console.log(`📊 Database: ${process.env.DB_NAME || 'manufacturing_system'}`);

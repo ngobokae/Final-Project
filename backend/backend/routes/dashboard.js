@@ -1172,7 +1172,7 @@ export const handleGetProcurementRecommendations = async (req, res) => {
         END as status,
         p.lead_time_days as lead_time
       FROM products p
-      JOIN inventory i ON p.product_id = i.product_id
+      JOIN inventory i ON p.id = i.product_id
       LEFT JOIN (
         SELECT product_id, SUM(forecasted_demand) as forecasted_demand
         FROM forecast_results

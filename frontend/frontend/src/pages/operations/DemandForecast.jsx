@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -221,45 +221,61 @@ export default function DemandForecast() {
     }
   };
 
-  const forecastData = forecasts
-    .slice()
-    .sort((a, b) => new Date(a.forecast_date) - new Date(b.forecast_date))
-    .map((f) => {
+  const buildAggregatedForecastSeries = (rows, dateKey = 'month') => {
+    const byDate = new Map();
+    for (const f of rows) {
+      const sortKey = new Date(f.forecast_date).toISOString().split('T')[0];
+      const label = new Date(f.forecast_date).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      });
       const demand = Number(f.forecasted_demand) || 0;
       const rawConf = f.confidence_level;
-      const numericConf =
-        typeof rawConf === 'number' ? rawConf : Number(rawConf);
-      const confidence =
-        Number.isFinite(numericConf) && numericConf > 0 ? numericConf : 0.95;
-      const margin = demand * (1 - confidence) * 0.5;
-      return {
-        month: new Date(f.forecast_date).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-        }),
-        forecast: demand,
-        lowerBound: Math.max(0, Math.round(demand - margin)),
-        upperBound: Math.round(demand + margin),
-        confidence,
+      const numericConf = typeof rawConf === 'number' ? rawConf : Number(rawConf);
+      const confidence = Number.isFinite(numericConf) && numericConf > 0 ? numericConf : 0.95;
+      const existing = byDate.get(sortKey) || {
+        sortKey,
+        [dateKey]: label,
+        forecast: 0,
+        confidenceSum: 0,
+        count: 0,
       };
-    });
+      existing.forecast += demand;
+      existing.confidenceSum += confidence;
+      existing.count += 1;
+      byDate.set(sortKey, existing);
+    }
 
-  const trendAnalysisData = forecasts
-    .slice()
-    .sort((a, b) => new Date(a.forecast_date) - new Date(b.forecast_date))
-    .map((f) => {
-      const demand = Number(f.forecasted_demand) || 0;
-      const trendBase = f.trend_indicator === 'increasing'
-        ? demand * 1.1
-        : f.trend_indicator === 'decreasing'
-          ? demand * 0.9
-          : demand;
-      return {
-        date: new Date(f.forecast_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        forecast: demand,
-        trend: Math.round(trendBase),
-      };
-    });
+    return [...byDate.values()]
+      .map((entry) => {
+        const demand = entry.forecast;
+        const confidence = entry.count > 0 ? entry.confidenceSum / entry.count : 0.95;
+        const margin = demand * (1 - confidence) * 0.5;
+        return {
+          sortKey: entry.sortKey,
+          [dateKey]: entry[dateKey],
+          forecast: demand,
+          lowerBound: Math.max(0, Math.round(demand - margin)),
+          upperBound: Math.round(demand + margin),
+          confidence,
+        };
+      })
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  };
+
+  const forecastData = useMemo(
+    () => buildAggregatedForecastSeries(forecasts, 'month'),
+    [forecasts]
+  );
+
+  const trendAnalysisData = useMemo(() => {
+    const aggregated = buildAggregatedForecastSeries(forecasts, 'date');
+    return aggregated.map((entry) => ({
+      date: entry.date,
+      forecast: entry.forecast,
+      trend: entry.forecast,
+    }));
+  }, [forecasts]);
 
   const modelsForUI = demandModels.length ? demandModels : DEFAULT_DEMAND_MODELS;
 
@@ -543,26 +559,28 @@ export default function DemandForecast() {
             <Card>
               <CardHeader>
                 <CardTitle>Forecast Visualization</CardTitle>
-                <CardDescription>Demand forecast with confidence intervals</CardDescription>
+                <CardDescription>
+                  {selectedProduct === 'all'
+                    ? 'Daily total demand across all products. Bars vary by weekday — re-run Predict 2 after uploading sales to refresh.'
+                    : 'Daily demand forecast for the selected product (varies by day of week and trend).'}
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-[400px]" style={{ backgroundColor: darkBlueChartTheme.background, borderRadius: '8px', padding: '16px' }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={forecastData}>
-                      <AreaGradient id="forecastDemand" />
+                    <BarChart data={forecastData}>
                       <CartesianGrid {...gridProps} />
                       <XAxis dataKey="month" {...axisProps} />
                       <YAxis {...axisProps} />
                       <Tooltip {...tooltipProps} />
-                      <Area 
-                        type="monotone" 
-                        dataKey="forecast" 
-                        stroke={darkBlueChartTheme.lineColor}
-                        strokeWidth={2}
-                        fill="url(#areaGradient-forecastDemand)"
-                        fillOpacity={darkBlueChartTheme.areaFillOpacity}
+                      <Legend />
+                      <Bar
+                        dataKey="forecast"
+                        name="Predicted demand"
+                        fill={darkBlueChartTheme.lineColor}
+                        radius={[4, 4, 0, 0]}
                       />
-                    </AreaChart>
+                    </BarChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
@@ -696,21 +714,18 @@ export default function DemandForecast() {
             <CardContent>
               <div className="h-[400px]" style={{ backgroundColor: darkBlueChartTheme.background, borderRadius: '8px', padding: '16px' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={trendAnalysisData}>
-                    <AreaGradient id="trendAnalysis" />
+                  <BarChart data={trendAnalysisData}>
                     <CartesianGrid {...gridProps} />
                     <XAxis dataKey="date" {...axisProps} />
                     <YAxis {...axisProps} />
                     <Tooltip {...tooltipProps} />
-                    <Area 
-                      type="monotone" 
-                      dataKey="forecast" 
-                      stroke={darkBlueChartTheme.lineColor}
-                      strokeWidth={2}
-                      fill="url(#areaGradient-trendAnalysis)"
-                      fillOpacity={darkBlueChartTheme.areaFillOpacity}
+                    <Bar
+                      dataKey="forecast"
+                      name="Demand"
+                      fill={darkBlueChartTheme.lineColor}
+                      radius={[4, 4, 0, 0]}
                     />
-                  </AreaChart>
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>

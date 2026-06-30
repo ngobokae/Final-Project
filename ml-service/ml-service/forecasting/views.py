@@ -37,6 +37,9 @@ warnings.filterwarnings('ignore', category=UserWarning)
 warnings.filterwarnings('ignore', category=DeprecationWarning)
 warnings.filterwarnings('ignore', category=RuntimeWarning)
 
+# Mon–Sun weights used when sales history is too sparse for real weekday patterns.
+DEFAULT_WEEKDAY_WEIGHTS = np.array([1.0, 1.06, 1.12, 1.08, 1.15, 0.88, 0.72])
+
 
 def _safe_int(value, default=0):
     try:
@@ -146,6 +149,13 @@ class ForecastView(APIView):
         series_df = series_df.reset_index()
         return series_df
 
+    def _seasonal_factor(self, day_of_week, weekly_avg, weekly_mean):
+        """Weekday multiplier — uses defaults when history has fewer than 3 active weekdays."""
+        if len(weekly_avg) >= 3 and weekly_mean > 0:
+            return max(0.5, float(weekly_avg.get(day_of_week, weekly_mean) / weekly_mean))
+        weights = DEFAULT_WEEKDAY_WEIGHTS
+        return float(weights[day_of_week] / weights.mean())
+
     def _build_forecast_list(self, df, values, model_type, confidence_base=0.92):
         df_series = self._prepare_series(df)
         last_date = df_series['sale_date'].max()
@@ -157,8 +167,9 @@ class ForecastView(APIView):
         for i, raw_value in enumerate(values, start=1):
             forecast_date = last_date + timedelta(days=i)
             day_of_week = forecast_date.weekday()
-            seasonal_factor = (weekly_avg.get(day_of_week, weekly_mean) / weekly_mean) if weekly_mean else 1.0
-            forecasted_demand = max(0, _safe_int(raw_value, default=0))
+            seasonal_factor = self._seasonal_factor(day_of_week, weekly_avg, weekly_mean)
+            base_demand = max(0.0, float(raw_value))
+            forecasted_demand = max(0, _safe_int(base_demand * seasonal_factor, default=0))
             confidence = max(0.55, min(0.98, confidence_base - (i * 0.002) - abs(seasonal_factor - 1) * 0.01))
             trend_indicator = 'stable'
             if forecasted_demand > last_quantity * 1.05:
@@ -181,9 +192,16 @@ class ForecastView(APIView):
         if len(df_series) == 0:
             values = [0] * days_ahead
         else:
-            window = min(14, len(df_series))
-            last_ma = df_series['quantity'].tail(window).mean()
-            values = [last_ma] * days_ahead
+            nonzero = df_series[df_series['quantity'] > 0]
+            span_days = max(1, (df_series['sale_date'].max() - df_series['sale_date'].min()).days + 1)
+            if len(nonzero) <= 2 or len(df_series) < 8:
+                # CSV / single-row uploads: spread total sold across days instead of one flat repeat.
+                total = float(df_series['quantity'].sum())
+                avg_daily = total / span_days if span_days > 1 else total / max(days_ahead, 1)
+            else:
+                window = min(14, len(df_series))
+                avg_daily = float(df_series['quantity'].tail(window).mean())
+            values = [avg_daily] * days_ahead
         return self._build_forecast_list(df, values, source, confidence_base=0.75)
 
     def _forecast_arima(self, df, days_ahead):

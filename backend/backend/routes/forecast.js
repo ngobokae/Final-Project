@@ -3,6 +3,7 @@ import { parseBody, sendJSON, sendError, parseQuery } from '../utils/helpers.js'
 import { logAudit } from '../utils/logger.js';
 import { recalculateAndPersistKPIs } from './kpis.js';
 import { parseUploadedFile, validateInventoryFileStructure, transformToForecastData } from '../utils/fileParser.js';
+import { ensureRecommendationSchema } from '../utils/schema.js';
 import http from 'http';
 import Busboy from 'busboy';
 
@@ -342,6 +343,8 @@ const saveForecastRows = async (productId, forecasts, { unitPrice = 0, modelType
 // Shared helper to generate and persist an inventory recommendation for a single product.
 // Used both by the explicit recommendations endpoint and automatically after forecasts are generated.
 const generateInventoryRecommendationForProduct = async (product_id, userId = null, req = null) => {
+  await ensureRecommendationSchema();
+
   // Get product inventory and forecast data
   const [inventory] = await query(
     `
@@ -369,26 +372,65 @@ const generateInventoryRecommendationForProduct = async (product_id, userId = nu
     [product_id]
   );
 
-  // Call ML service for optimization
-  const mlResponse = await callMLService('/api/optimize-inventory/', 'POST', {
-    product_id,
-    current_stock: inventory.current_stock,
-    reorder_point: inventory.reorder_point,
-    safety_stock: inventory.safety_stock,
-    lead_time_days: inventory.lead_time_days,
-    forecasts,
-  });
-
   const currentStock = Number(inventory.current_stock || 0);
   const availableStock = Number(inventory.available_stock ?? currentStock);
   const reorderPoint = Number(inventory.reorder_point || 0);
-  const fallbackQty = Math.max(1, reorderPoint - availableStock);
+  const safetyStock = Number(inventory.safety_stock || 0);
+  const forecastDemand = forecasts.reduce(
+    (sum, row) => sum + Number(row.forecasted_demand || 0),
+    0
+  );
+  const projectedGap = Math.max(0, Math.ceil(forecastDemand * 1.2 - availableStock));
+  const reorderGap = Math.max(0, reorderPoint - availableStock);
+  const safetyGap = Math.max(0, safetyStock - availableStock);
+
+  let mlResponse = {
+    recommended_stock: reorderPoint,
+    optimal_order_quantity: 0,
+    risk_level: 'low',
+    risk_type: 'none',
+    reasoning: 'Stock levels are within target range.',
+  };
+
+  try {
+    mlResponse = await callMLService('/api/optimize-inventory/', 'POST', {
+      product_id,
+      current_stock: inventory.current_stock,
+      reorder_point: inventory.reorder_point,
+      safety_stock: inventory.safety_stock,
+      lead_time_days: inventory.lead_time_days,
+      forecasts,
+    });
+  } catch (mlError) {
+    console.warn(`ML optimize-inventory failed for product ${product_id}:`, mlError.message);
+  }
+
   const rawQty = Number(mlResponse.optimal_order_quantity || 0);
   const riskLevel = String(mlResponse.risk_level || '').toLowerCase();
+  const fallbackQty = Math.max(reorderGap, safetyGap, projectedGap, 1);
   const shouldForcePositiveQty =
     rawQty <= 0 &&
-    (availableStock < reorderPoint || riskLevel === 'critical' || riskLevel === 'high' || riskLevel === 'medium');
-  const finalOptimalQty = shouldForcePositiveQty ? fallbackQty : Math.max(0, rawQty);
+    (availableStock < reorderPoint || projectedGap > 0 || riskLevel === 'critical' || riskLevel === 'high' || riskLevel === 'medium');
+  let finalOptimalQty = shouldForcePositiveQty ? fallbackQty : Math.max(0, rawQty);
+  if (projectedGap > finalOptimalQty) {
+    finalOptimalQty = projectedGap;
+  }
+
+  let riskType = mlResponse.risk_type || 'none';
+  let reasoning = mlResponse.reasoning || 'Inventory optimization recommendation.';
+  if (finalOptimalQty > 0 && availableStock < safetyStock) {
+    riskType = 'shortage';
+    reasoning = `Below safety stock (${availableStock}/${safetyStock}). Forecast demand (${forecastDemand}) suggests ordering ${finalOptimalQty} units.`;
+  } else if (finalOptimalQty > 0 && projectedGap > 0) {
+    riskType = 'shortage';
+    reasoning = `Forecast demand (${forecastDemand}) exceeds available stock (${availableStock}). Suggested order: ${finalOptimalQty} units.`;
+  } else if (finalOptimalQty > 0 && availableStock < reorderPoint) {
+    riskType = 'shortage';
+    reasoning = `Below reorder point (${availableStock}/${reorderPoint}). Suggested order: ${finalOptimalQty} units.`;
+  } else if (finalOptimalQty <= 0 && availableStock > reorderPoint * 2) {
+    riskType = 'overstock';
+    reasoning = mlResponse.reasoning || 'Current stock is above recommended levels.';
+  }
 
   // Store recommendation
   await query(
@@ -403,11 +445,11 @@ const generateInventoryRecommendationForProduct = async (product_id, userId = nu
        reasoning = VALUES(reasoning)`,
     [
       product_id,
-      mlResponse.recommended_stock,
+      mlResponse.recommended_stock || reorderPoint,
       finalOptimalQty,
-      mlResponse.risk_level,
-      mlResponse.risk_type,
-      mlResponse.reasoning,
+      mlResponse.risk_level || (finalOptimalQty > 0 ? 'medium' : 'low'),
+      riskType,
+      reasoning,
     ]
   );
 
@@ -659,6 +701,7 @@ export const handleBulkGenerateForecast = async (req, res) => {
     let skipped = 0;
     let rowsSaved = 0;
     const errors = [];
+    const generatedProductIds = [];
 
     const runOne = async (productId) => {
       const salesData = await query(
@@ -667,7 +710,7 @@ export const handleBulkGenerateForecast = async (req, res) => {
       );
       if (!salesData.length) {
         skipped += 1;
-        return;
+        return null;
       }
 
       const unitPrice = await resolveUnitPrice(productId);
@@ -691,23 +734,33 @@ export const handleBulkGenerateForecast = async (req, res) => {
       if (saved > 0) {
         generated += 1;
         rowsSaved += saved;
-      } else {
-        skipped += 1;
+        return productId;
       }
+      skipped += 1;
+      return null;
     };
 
     for (let i = 0; i < productIds.length; i += concurrency) {
       const batch = productIds.slice(i, i + concurrency);
       const results = await Promise.allSettled(batch.map((pid) => runOne(pid)));
       results.forEach((result, idx) => {
-        if (result.status === 'rejected') {
+        if (result.status === 'fulfilled' && result.value) {
+          generatedProductIds.push(result.value);
+        } else if (result.status === 'rejected') {
           skipped += 1;
           errors.push({ product_id: batch[idx], message: result.reason?.message || 'Failed' });
         }
       });
     }
 
-    if (generated > 0) {
+    if (generatedProductIds.length > 0) {
+      for (const productId of generatedProductIds) {
+        try {
+          await generateInventoryRecommendationForProduct(productId, req.user.id, req);
+        } catch (recError) {
+          console.warn(`Bulk recommendation failed for product ${productId}:`, recError.message);
+        }
+      }
       try {
         await recalculateAndPersistKPIs(30);
       } catch (kpiError) {
@@ -733,6 +786,7 @@ export const handleBulkGenerateForecast = async (req, res) => {
 
 export const handleGetInventoryRecommendations = async (req, res) => {
   try {
+    await ensureRecommendationSchema();
     const queryParams = req.query || {};
     const productId = queryParams.product_id;
 
@@ -746,21 +800,25 @@ export const handleGetInventoryRecommendations = async (req, res) => {
         p.reorder_point,
         i.current_stock,
         i.available_stock,
+        COALESCE(f.forecast_demand, 0) as forecast_demand,
         CASE
           WHEN COALESCE(ir.optimal_order_quantity, 0) > 0 THEN ir.optimal_order_quantity
           WHEN COALESCE(i.available_stock, i.current_stock, 0) < COALESCE(p.reorder_point, 0)
             THEN GREATEST(1, COALESCE(p.reorder_point, 0) - COALESCE(i.available_stock, i.current_stock, 0))
+          WHEN COALESCE(f.forecast_demand, 0) > COALESCE(i.available_stock, i.current_stock, 0)
+            THEN GREATEST(1, CEIL(COALESCE(f.forecast_demand, 0) * 1.2 - COALESCE(i.available_stock, i.current_stock, 0)))
           ELSE 0
         END as effective_order_quantity
       FROM inventory_recommendations ir
       JOIN products p ON ir.product_id = p.id
       JOIN inventory i ON ir.product_id = i.product_id
-      WHERE COALESCE(i.available_stock, i.current_stock, 0) < COALESCE(p.reorder_point, 999999)
-        AND ir.risk_type != 'overstock'
-        AND (
-          COALESCE(ir.optimal_order_quantity, 0) > 0
-          OR COALESCE(i.available_stock, i.current_stock, 0) < COALESCE(p.reorder_point, 0)
-        )
+      LEFT JOIN (
+        SELECT product_id, SUM(forecasted_demand) as forecast_demand
+        FROM forecast_results
+        WHERE forecast_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+        GROUP BY product_id
+      ) f ON f.product_id = ir.product_id
+      WHERE ir.risk_type != 'overstock'
         AND NOT EXISTS (
           SELECT 1 FROM procurement_orders po
           WHERE po.product_id = ir.product_id
@@ -774,9 +832,30 @@ export const handleGetInventoryRecommendations = async (req, res) => {
       params.push(productId);
     }
 
-    sql += ' ORDER BY ir.risk_level DESC, ir.created_at DESC';
+    sql += ` HAVING effective_order_quantity > 0
+      ORDER BY ir.risk_level DESC, ir.created_at DESC`;
 
-    const recommendations = await query(sql, params);
+    let recommendations = await query(sql, params);
+
+    if (!recommendations.length && !productId) {
+      const forecastProducts = await query(`
+        SELECT DISTINCT product_id
+        FROM forecast_results
+        WHERE forecast_date >= CURDATE()
+        ORDER BY product_id ASC
+        LIMIT 20
+      `);
+      for (const row of forecastProducts) {
+        try {
+          await generateInventoryRecommendationForProduct(row.product_id);
+        } catch (syncError) {
+          console.warn(`Recommendation sync failed for product ${row.product_id}:`, syncError.message);
+        }
+      }
+      if (forecastProducts.length) {
+        recommendations = await query(sql, params);
+      }
+    }
 
     sendJSON(res, 200, { recommendations });
   } catch (error) {

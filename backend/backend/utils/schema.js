@@ -51,3 +51,35 @@ export const ensureMoneyColumnPrecision = async () => {
 
   moneyColumnsEnsured = true;
 };
+
+let recommendationSchemaEnsured = false;
+
+/** One recommendation row per product so upserts work correctly. */
+export const ensureRecommendationSchema = async () => {
+  if (recommendationSchemaEnsured) return;
+
+  const dbName = process.env.DB_NAME || 'manufacturing_system';
+  const indexes = await query(
+    `SELECT INDEX_NAME, NON_UNIQUE
+     FROM INFORMATION_SCHEMA.STATISTICS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'inventory_recommendations' AND COLUMN_NAME = 'product_id'`,
+    [dbName]
+  );
+
+  const hasUniqueProduct = indexes.some(
+    (row) => row.NON_UNIQUE === 0 || row.NON_UNIQUE === '0'
+  );
+
+  if (!hasUniqueProduct) {
+    await query(`
+      DELETE ir1 FROM inventory_recommendations ir1
+      INNER JOIN inventory_recommendations ir2
+        ON ir1.product_id = ir2.product_id AND ir1.id > ir2.id
+    `).catch(() => {});
+    await query(
+      'ALTER TABLE inventory_recommendations ADD UNIQUE KEY uq_inventory_rec_product (product_id)'
+    ).catch(() => {});
+  }
+
+  recommendationSchemaEnsured = true;
+};
